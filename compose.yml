@@ -1,0 +1,135 @@
+services:
+  # Database Context
+  db:
+    image: postgres:16-alpine
+    container_name: creator_pilot_db
+    restart: always
+    environment:
+      POSTGRES_DB: creator_pilot
+      POSTGRES_USER: cp_admin
+      POSTGRES_PASSWORD: cp_secure_password_135
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cp_admin -d creator_pilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Cache & Event Broker Context
+  cache:
+    image: redis:7-alpine
+    container_name: creator_pilot_cache
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Django Backend Context
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: creator_pilot_backend
+    restart: always
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_NAME=creator_pilot
+      - DB_USER=cp_admin
+      - DB_PASSWORD=cp_secure_password_135
+      - DB_PORT=5432
+      - REDIS_URL=redis://cache:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DEBUG=True
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+
+  # Celery Background Worker Context
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: creator_pilot_celery_worker
+    restart: always
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_HOST=db
+      - DB_NAME=creator_pilot
+      - DB_USER=cp_admin
+      - DB_PASSWORD=cp_secure_password_135
+      - DB_PORT=5432
+      - REDIS_URL=redis://cache:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DEBUG=True
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+
+  # Celery Scheduler Context
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: creator_pilot_celery_beat
+    restart: always
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    environment:
+      - DB_HOST=db
+      - DB_NAME=creator_pilot
+      - DB_USER=cp_admin
+      - DB_PASSWORD=cp_secure_password_135
+      - DB_PORT=5432
+      - REDIS_URL=redis://cache:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
+      - DEBUG=True
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+
+  # Next.js Frontend Context
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: creator_pilot_frontend
+    restart: always
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

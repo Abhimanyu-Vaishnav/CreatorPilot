@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+jspm_packages/
+web_modules/
+.npm
+.yarn
+
+# Next.js Build and Cache
+.next/
+out/
+build/
+dist/
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.env
+.venv
+poetry.lock
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+htmlcov/
+*.log
+.pytest_cache/
+
+# Local databases / volumes
+postgres_data/
+redis_data/
+db.sqlite3
+db.sqlite3-journal
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
