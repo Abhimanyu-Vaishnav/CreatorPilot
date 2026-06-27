@@ -8,4 +8,5 @@ def health_check(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health-check'),
+    path('api/auth/', include('apps.identity.presentation.urls')),
 ]
