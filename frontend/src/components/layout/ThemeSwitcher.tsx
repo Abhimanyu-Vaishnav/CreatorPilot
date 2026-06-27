@@ -1,11 +1,21 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 
 export function ThemeSwitcher() {
   const { theme, toggleTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    // Render an empty container of matching size to prevent layout shifts during hydration
+    return <div className="w-8 h-8 rounded-lg border border-transparent"></div>;
+  }
 
   return (
     <button
