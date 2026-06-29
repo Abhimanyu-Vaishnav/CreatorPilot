@@ -32,7 +32,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen, isAiEnabled = true, setIs
 
   const menuItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Projects", href: "/dashboard/projects", icon: FolderKanban, disabled: true },
+    { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
     { name: "Knowledge Vault", href: "/dashboard/vault", icon: Database, disabled: true },
     { name: "Writing Studio", href: "/dashboard/studio", icon: FileText, disabled: true },
     { name: "Content Planner", href: "/dashboard/planner", icon: Calendar, disabled: true },
@@ -57,8 +57,19 @@ export function Sidebar({ sidebarOpen, setSidebarOpen, isAiEnabled = true, setIs
         </Link>
       </div>
 
+      {/* Quick Add Project Action */}
+      <div className="px-4 pt-4">
+        <Link
+          href="/dashboard/projects?create=true"
+          className="w-full h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/15 flex items-center justify-center gap-1.5 transition-all"
+        >
+          <Plus size={13} />
+          New Project
+        </Link>
+      </div>
+
       {/* Navigation items */}
-      <nav className="flex-1 space-y-1.5 px-4 py-6">
+      <nav className="flex-1 space-y-1.5 px-4 py-4">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
           
