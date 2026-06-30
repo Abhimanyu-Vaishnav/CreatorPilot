@@ -18,6 +18,7 @@ const schema = z.object({
   template: z.string(),
   favorite: z.boolean(),
   archived: z.boolean(),
+  project_progress: z.number().min(0).max(100),
 });
 
 type FormInput = z.infer<typeof schema>;
@@ -88,6 +89,7 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
       template: "Blank",
       favorite: false,
       archived: false,
+      project_progress: 0,
     },
   });
 
@@ -120,6 +122,7 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
         template: project.template || "Blank",
         favorite: project.favorite,
         archived: project.archived,
+        project_progress: project.project_progress ?? 0,
       });
     } else {
       reset({
@@ -132,13 +135,14 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
         template: "Blank",
         favorite: false,
         archived: false,
+        project_progress: 0,
       });
     }
   }, [project, reset, isOpen]);
 
   const handleFormSubmit = async (data: FormInput) => {
     try {
-      await onSubmit(data);
+      await onSubmit(data as CreateProjectInput);
       onClose();
     } catch (error) {
       console.error("Form submit error:", error);
@@ -254,7 +258,7 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
                 )}
               </div>
 
-              {/* Status & Options */}
+              {/* Status & Options & Progress */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
@@ -262,7 +266,7 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
                   </label>
                   <select
                     {...register("status")}
-                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 text-xs border border-zinc-200/50 dark:border-zinc-800/50 outline-none focus:border-indigo-600 dark:focus:border-indigo-500/50 focus:bg-white dark:focus:bg-[#0c0c0f] transition-all"
+                    className="w-full h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 text-xs border border-zinc-200/50 dark:border-zinc-800/50 outline-none focus:border-indigo-600 dark:focus:border-indigo-500/50 focus:bg-white dark:focus:bg-[#0c0c0f] transition-all font-semibold"
                   >
                     <option value="Planning">Planning</option>
                     <option value="In Progress">In Progress</option>
@@ -299,6 +303,26 @@ export function ProjectDialog({ isOpen, onClose, onSubmit, project = null, loadi
                     Archive
                   </button>
                 </div>
+              </div>
+
+              {/* Progress Slider */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                    Project Progress
+                  </label>
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    {watch("project_progress") || 0}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  {...register("project_progress", { valueAsNumber: true })}
+                  className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-850 rounded-lg appearance-none cursor-pointer accent-indigo-600 focus:outline-none"
+                />
               </div>
 
               {/* Color Selection */}

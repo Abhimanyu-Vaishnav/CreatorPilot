@@ -13,6 +13,7 @@ import {
   ProjectDialog,
   DeleteConfirmationDialog,
   ProjectCard,
+  useRecentActivityQuery,
 } from "../../features/projects";
 import {
   User,
@@ -73,6 +74,12 @@ function DashboardContent() {
     data: projectsData,
     isLoading: projectsLoading,
   } = useProjectsQuery({ limit: 100 });
+
+  // Fetch recent activity feed
+  const {
+    data: recentActivities,
+    isLoading: activitiesLoading,
+  } = useRecentActivityQuery();
 
   // Mutations
   const createMutation = useCreateProjectMutation();
@@ -379,6 +386,34 @@ function DashboardContent() {
 
               {/* Right Column: Categories breakdown & Quick Actions */}
               <div className="space-y-6">
+                
+                {/* Panel: Recent Activity Feed */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                    Recent Activity
+                  </h3>
+                  {activitiesLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 size={16} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : !recentActivities || recentActivities.length === 0 ? (
+                    <p className="text-xs text-zinc-400 text-center py-4 font-semibold">No recent activity.</p>
+                  ) : (
+                    <div className="space-y-3.5 max-h-[250px] overflow-y-auto pr-1">
+                      {recentActivities.slice(0, 5).map((act: any) => (
+                        <div key={act.id} className="text-xs space-y-0.5 border-l-2 pl-2.5 border-zinc-100 dark:border-zinc-900">
+                          <div className="text-zinc-800 dark:text-zinc-200 font-semibold">
+                            {act.action}
+                          </div>
+                          <div className="text-[10px] text-zinc-400 flex items-center justify-between">
+                            <span className="truncate max-w-[100px] font-bold">{act.project_title}</span>
+                            <span>{act.relative_time}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 
                 {/* Panel: Quick Actions */}
                 <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">

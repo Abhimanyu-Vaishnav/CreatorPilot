@@ -25,6 +25,7 @@ class Project(models.Model):
     template = models.CharField(max_length=50, default="Blank")
     favorite = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)
+    project_progress = models.IntegerField(default=0)
     last_opened_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,3 +47,26 @@ class Project(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ProjectActivity(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="activities"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="project_activities"
+    )
+    action = models.CharField(max_length=255)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.action} on {self.project.title}"
+

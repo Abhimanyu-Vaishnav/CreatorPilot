@@ -1,5 +1,5 @@
 import { api } from "../../../lib/api";
-import { Project, CreateProjectInput, UpdateProjectInput, ProjectsFilterParams } from "../types";
+import { Project, CreateProjectInput, UpdateProjectInput, ProjectsFilterParams, ProjectActivity, ProjectOverviewData } from "../types";
 
 export const projectsService = {
   getProjects: async (params?: ProjectsFilterParams): Promise<{ results: Project[]; count: number }> => {
@@ -51,5 +51,22 @@ export const projectsService = {
 
   deleteProject: async (slug: string): Promise<void> => {
     await api.request(`/api/projects/${slug}/`, { method: "DELETE" });
+  },
+
+  getProjectActivity: async (slug: string): Promise<ProjectActivity[]> => {
+    return api.get<ProjectActivity[]>(`/api/projects/${slug}/activity/`);
+  },
+
+  postProjectActivity: async (slug: string, action: string, metadata: Record<string, any> = {}): Promise<ProjectActivity> => {
+    return api.post<ProjectActivity>(`/api/projects/${slug}/activity/`, { action, metadata });
+  },
+
+  getRecentActivity: async (): Promise<ProjectActivity[]> => {
+    return api.get<ProjectActivity[]>("/api/projects/recent-activity/");
+  },
+
+  getProjectOverview: async (slug: string): Promise<ProjectOverviewData> => {
+    return api.get<ProjectOverviewData>(`/api/projects/${slug}/overview/`);
   }
 };
+

@@ -137,6 +137,23 @@ export function ProjectCard({
             {project.description || "No description provided. Add one to outline goals."}
           </p>
         </div>
+
+        {/* Progress Bar & Percentage */}
+        <div className="space-y-1 pt-1">
+          <div className="flex justify-between items-center text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider">
+            <span>Progress</span>
+            <span className="text-indigo-600 dark:text-indigo-400">{project.project_progress || 0}%</span>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${project.project_progress || 0}%`,
+                backgroundColor: project.color || "#6366f1",
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Footer Details */}
