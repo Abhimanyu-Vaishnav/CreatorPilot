@@ -36,11 +36,21 @@ class Project(models.Model):
             base_slug = slugify(self.title)
             if not base_slug:
                 base_slug = "project"
-            slug = base_slug
+            
+            # Append owner's user ID if available
+            owner_id = self.owner.id if (self.owner and self.owner.id) else None
+            if owner_id:
+                slug = f"{base_slug}-{owner_id}"
+            else:
+                slug = base_slug
+
             counter = 1
             # Ensure slug is unique globally
             while Project.objects.filter(slug=slug).exclude(id=self.id).exists():
-                slug = f"{base_slug}-{counter}"
+                if owner_id:
+                    slug = f"{base_slug}-{counter}-{owner_id}"
+                else:
+                    slug = f"{base_slug}-{counter}"
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
