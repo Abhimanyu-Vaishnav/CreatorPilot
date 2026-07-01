@@ -10,6 +10,7 @@ export const notesService = {
       if (params.favorite !== undefined) queryParts.push(`favorite=${params.favorite}`);
       if (params.pinned !== undefined) queryParts.push(`pinned=${params.pinned}`);
       if (params.archived !== undefined) queryParts.push(`archived=${params.archived}`);
+      if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
       if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
       if (params.ordering) queryParts.push(`ordering=${params.ordering}`);
     }

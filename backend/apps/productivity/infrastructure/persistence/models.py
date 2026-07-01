@@ -91,8 +91,14 @@ class Note(models.Model):
     archived = models.BooleanField(default=False)
     word_count = models.IntegerField(default=0)
     reading_time = models.IntegerField(default=0)
+    STATUS_CHOICES = [
+        ("Draft", "Draft"),
+        ("Published", "Published"),
+    ]
+
     color = models.CharField(max_length=50, default="#6366f1")
     template = models.CharField(max_length=50, default="Blank")
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Draft")
     last_opened_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -101,6 +107,15 @@ class Note(models.Model):
         ordering = ["-pinned", "-favorite", "-updated_at"]
 
     def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        import re
+
+        # Validation
+        if not self.title or not self.title.strip():
+            raise ValidationError("Title cannot be empty")
+        if len(self.title) > 100:
+            raise ValidationError("Title cannot exceed 100 characters")
+
         # Initialize template content if empty and template is set
         if not self.content and self.template and self.template != "Blank":
             templates = {
@@ -124,6 +139,9 @@ class Note(models.Model):
                 slug = f"{base_slug}-{counter}"
                 counter += 1
             self.slug = slug
+        else:
+            if not re.match(r"^[a-z0-9-_]+$", self.slug):
+                raise ValidationError("Invalid slug format. Slugs can only contain lowercase letters, numbers, hyphens, and underscores.")
 
         # Calculate statistics
         words = len(self.content.split())

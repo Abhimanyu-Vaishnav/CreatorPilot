@@ -364,6 +364,70 @@ export default function ProjectWorkspacePage() {
                 </div>
               </div>
 
+              {/* Card: Recent Project Notes */}
+              <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] space-y-4 shadow-sm">
+                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-900 pb-3">
+                  <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <FileText size={16} className="text-zinc-400" />
+                    Recent Notes & Drafts
+                  </h3>
+                  <button
+                    onClick={() => handleTabChange("notes")}
+                    className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer font-sans"
+                  >
+                    View All Notes
+                  </button>
+                </div>
+                
+                {projectNotes.length === 0 ? (
+                  <p className="text-xs text-zinc-500 py-4 text-center font-semibold">
+                    No notes created in this project workspace yet. Switch to the Notes tab to add your first draft.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-900/50">
+                    {[...projectNotes]
+                      .filter((n) => !n.archived)
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .slice(0, 5)
+                      .map((note) => (
+                        <Link
+                          key={note.id}
+                          href={`/dashboard/projects/${slug}/notes/${note.slug}`}
+                          className="flex items-center justify-between py-3 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10 transition-colors px-1 group"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: note.color || "#6366f1" }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-xs text-zinc-900 dark:text-zinc-50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate block">
+                                {note.title}
+                              </span>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 truncate block mt-0.5 max-w-[300px]">
+                                {note.excerpt || "No description."}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3 text-[10px] text-zinc-400 flex-shrink-0 font-semibold pl-4">
+                            <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide text-zinc-550">
+                              {note.template}
+                            </span>
+                            {note.status === "Published" ? (
+                              <span className="bg-indigo-50/80 border border-indigo-200/30 text-indigo-650 dark:bg-indigo-950/20 dark:text-indigo-400 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold">
+                                Published
+                              </span>
+                            ) : (
+                              <span className="bg-zinc-150/40 border border-zinc-200/20 text-zinc-550 dark:bg-zinc-900/30 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold">
+                                Draft
+                              </span>
+                            )}
+                            <span className="hidden sm:inline font-semibold text-[10px] text-zinc-450 dark:text-zinc-500">{new Date(note.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </Link>
+                      ))}
+                  </div>
+                )}
+              </div>
+
               {/* Card 3: Activity Timeline */}
               <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] space-y-4 shadow-sm">
                 <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-900">

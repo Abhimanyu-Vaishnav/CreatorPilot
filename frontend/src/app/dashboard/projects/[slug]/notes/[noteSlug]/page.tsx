@@ -8,6 +8,8 @@ import {
   SimpleEditor,
   useNoteQuery,
   useUpdateNoteMutation,
+  useCreateNoteMutation,
+  NoteInfoPanel,
 } from "../../../../../../features/notes";
 import { Breadcrumbs } from "../../../../../../features/projects/components/Breadcrumbs";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -22,6 +24,7 @@ function NoteDetailContent() {
   const { data: note, isLoading: isNoteLoading, isError, error } = useNoteQuery(noteSlug);
 
   const updateMutation = useUpdateNoteMutation();
+  const createMutation = useCreateNoteMutation();
 
   const handleSave = async (data: { title: string; content: string }) => {
     if (!note) return;
@@ -55,6 +58,29 @@ function NoteDetailContent() {
       data: { archived: isArchiving },
     });
     router.push(`/dashboard/projects/${projectSlug}?tab=notes`);
+  };
+
+  const handleUpdateStatus = async (status: "Draft" | "Published") => {
+    if (!note) return;
+    await updateMutation.mutateAsync({
+      slug: note.slug,
+      data: { status },
+    });
+  };
+
+  const handleDuplicate = async () => {
+    if (!note || !project) return;
+    const newNote = await createMutation.mutateAsync({
+      project: project.id,
+      title: `${note.title} (Copy)`,
+      content: note.content,
+      template: note.template,
+      color: note.color,
+      pinned: note.pinned,
+      favorite: note.favorite,
+      status: note.status,
+    });
+    router.push(`/dashboard/projects/${projectSlug}/notes/${newNote.slug}`);
   };
 
   const handleClose = () => {
@@ -94,14 +120,29 @@ function NoteDetailContent() {
           </div>
         </div>
       ) : (
-        <SimpleEditor
-          note={note}
-          onSave={handleSave}
-          onToggleFavorite={handleToggleFavorite}
-          onTogglePin={handleTogglePin}
-          onToggleArchive={handleToggleArchive}
-          onClose={handleClose}
-        />
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          {/* Left Column: Simple Editor Workspace */}
+          <div className="flex-1 w-full min-w-0">
+            <SimpleEditor
+              note={note}
+              onSave={handleSave}
+              onToggleFavorite={handleToggleFavorite}
+              onTogglePin={handleTogglePin}
+              onToggleArchive={handleToggleArchive}
+              onClose={handleClose}
+              onDuplicate={handleDuplicate}
+            />
+          </div>
+
+          {/* Right Column: Note Properties Info Panel */}
+          <NoteInfoPanel
+            note={note}
+            project={project}
+            onUpdateStatus={handleUpdateStatus}
+            onTogglePin={handleTogglePin}
+            onToggleFavorite={handleToggleFavorite}
+          />
+        </div>
       )}
     </div>
   );

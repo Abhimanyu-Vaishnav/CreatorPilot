@@ -181,6 +181,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
         else:
             notes = notes.filter(archived=False)
             
+        status_param = request.query_params.get("status")
+        if status_param:
+            notes = notes.filter(status=status_param)
+            
         search = request.query_params.get("search")
         if search:
             notes = notes.filter(
@@ -239,6 +243,10 @@ class NoteViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(archived=False)
         else:
             queryset = queryset.filter(archived=False)
+
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param)
 
         # Search
         search = self.request.query_params.get("search")
@@ -307,6 +315,7 @@ class NoteViewSet(viewsets.ModelViewSet):
         old_pinned = instance.pinned
         old_favorite = instance.favorite
         old_archived = instance.archived
+        old_status = instance.status
 
         updated_instance = serializer.save()
 
@@ -318,6 +327,8 @@ class NoteViewSet(viewsets.ModelViewSet):
             action_name = "Note Favorited" if updated_instance.favorite else "Note Unfavorited"
         elif old_archived != updated_instance.archived:
             action_name = "Note Archived" if updated_instance.archived else "Note Restored"
+        elif old_status != updated_instance.status:
+            action_name = f"Note Status Set to {updated_instance.status}"
 
         ProjectActivity.objects.create(
             project=updated_instance.project,

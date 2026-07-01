@@ -16,6 +16,7 @@ export interface Note {
   reading_time: number;
   color: string;
   template: string;
+  status: "Draft" | "Published";
   last_opened_at: string | null;
   created_at: string;
   updated_at: string;
@@ -29,11 +30,13 @@ export interface CreateNoteInput {
   pinned?: boolean;
   color?: string;
   template?: string;
+  status?: "Draft" | "Published";
 }
 
 export interface UpdateNoteInput extends Partial<CreateNoteInput> {
   archived?: boolean;
   excerpt?: string;
+  status?: "Draft" | "Published";
 }
 
 export interface NotesFilterParams {
@@ -41,6 +44,7 @@ export interface NotesFilterParams {
   favorite?: boolean;
   pinned?: boolean;
   archived?: boolean;
+  status?: string;
   search?: string;
   ordering?: string;
 }

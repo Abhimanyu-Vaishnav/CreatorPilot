@@ -97,6 +97,7 @@ class NoteSerializer(serializers.ModelSerializer):
             'reading_time',
             'color',
             'template',
+            'status',
             'last_opened_at',
             'created_at',
             'updated_at',
@@ -112,5 +113,12 @@ class NoteSerializer(serializers.ModelSerializer):
             'created_at', 
             'updated_at'
         ]
+
+    def validate_title(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Title cannot be empty")
+        if len(value) > 100:
+            raise serializers.ValidationError("Title cannot exceed 100 characters")
+        return value
 
 

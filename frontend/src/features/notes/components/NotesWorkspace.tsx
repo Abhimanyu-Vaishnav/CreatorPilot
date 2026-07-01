@@ -29,6 +29,7 @@ import {
 } from "../hooks/useNotes";
 import { Note } from "../types";
 import { NoteDialog } from "./NoteDialog";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 
 interface NotesWorkspaceProps {
   projectSlug: string;
@@ -46,6 +47,25 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+
+  // Reusable Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    confirmText: string;
+    cancelText: string;
+    type: "danger" | "warning" | "info";
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    confirmText: "",
+    cancelText: "",
+    type: "warning",
+    onConfirm: () => {},
+  });
 
   // API Queries & Mutations
   const { data: notes = [], isLoading } = useProjectNotesQuery(projectSlug);
@@ -88,31 +108,62 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
   const handleToggleArchive = async (e: React.MouseEvent, note: Note) => {
     e.preventDefault();
     e.stopPropagation();
-    await updateMutation.mutateAsync({
-      slug: note.slug,
-      data: { archived: !note.archived },
+    setConfirmDialog({
+      isOpen: true,
+      title: note.archived ? "Restore Note" : "Archive Note",
+      description: note.archived 
+        ? `Restore note "${note.title}" back to active workspace?`
+        : `Are you sure you want to archive note "${note.title}"?`,
+      confirmText: note.archived ? "Restore" : "Archive",
+      cancelText: "Cancel",
+      type: "info",
+      onConfirm: async () => {
+        await updateMutation.mutateAsync({
+          slug: note.slug,
+          data: { archived: !note.archived },
+        });
+      }
     });
   };
 
   const handleDelete = async (e: React.MouseEvent, note: Note) => {
     e.preventDefault();
     e.stopPropagation();
-    if (confirm(`Are you sure you want to delete note "${note.title}"?`)) {
-      await deleteMutation.mutateAsync(note.slug);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Note",
+      description: `Are you sure you want to permanently delete note "${note.title}"? This cannot be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      type: "danger",
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(note.slug);
+      }
+    });
   };
 
   const handleDuplicate = async (e: React.MouseEvent, note: Note) => {
     e.preventDefault();
     e.stopPropagation();
-    await createMutation.mutateAsync({
-      project: projectId,
-      title: `${note.title} (Copy)`,
-      content: note.content,
-      template: note.template,
-      color: note.color,
-      pinned: note.pinned,
-      favorite: note.favorite,
+    setConfirmDialog({
+      isOpen: true,
+      title: "Duplicate Note",
+      description: `Create a copy of note "${note.title}" in this workspace?`,
+      confirmText: "Duplicate",
+      cancelText: "Cancel",
+      type: "info",
+      onConfirm: async () => {
+        await createMutation.mutateAsync({
+          project: projectId,
+          title: `${note.title} (Copy)`,
+          content: note.content,
+          template: note.template,
+          color: note.color,
+          pinned: note.pinned,
+          favorite: note.favorite,
+          status: note.status,
+        });
+      }
     });
   };
 
@@ -293,26 +344,31 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
         </div>
       ) : filteredNotes.length === 0 ? (
         /* Empty State */
-        <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-white/30 dark:bg-[#0e0e11]/25 flex flex-col items-center justify-center max-w-md mx-auto space-y-4 py-16">
-          <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 dark:border-zinc-850 flex items-center justify-center text-zinc-400 dark:text-zinc-550 shadow-inner">
-            <FileText size={22} />
+        <div className="p-8 text-center rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#0c0c0f]/20 flex flex-col items-center justify-center max-w-lg mx-auto space-y-4 py-16 animate-fadeIn shadow-sm">
+          {/* Custom SVG Illustration */}
+          <div className="relative w-16 h-16 rounded-2xl bg-indigo-500/5 flex items-center justify-center border border-indigo-500/10 shadow-inner">
+            <svg className="w-8 h-8 text-indigo-505 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full animate-ping opacity-60" />
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full" />
           </div>
-          <div>
-            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">No notes found</h3>
-            <p className="text-xs text-zinc-500 dark:text-zinc-500 max-w-xs mx-auto mt-1 leading-relaxed">
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-zinc-950 dark:text-zinc-50 font-sans">Notes Workspace Empty</h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto leading-relaxed font-semibold">
               {searchQuery
-                ? "No notes matched your search query. Try broadening your criteria."
+                ? "No drafts matched your search query. Try broadening your keywords."
                 : showArchived
                 ? "Your archived workspace is empty."
-                : "Initialize writing studio drafts, templates, or meeting plans in notes workspace."}
+                : "Create outline drafts, meeting agendas, YouTube outlines, or SEO structures. Notes are the workspace core."}
             </p>
           </div>
           {!searchQuery && !showArchived && (
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/10 transition-all flex items-center gap-1"
+              className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-indigo-600/10 transition-all flex items-center gap-1.5 cursor-pointer font-sans"
             >
-              <Plus size={13} />
+              <Plus size={14} />
               Create First Note
             </button>
           )}
@@ -361,10 +417,23 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
 
                   <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-900/60 pt-3 mt-4 text-[10px] text-zinc-400 dark:text-zinc-500 font-bold">
                     <div className="flex items-center gap-2">
-                      <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide text-zinc-500">
+                      <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide text-zinc-550">
                         {note.template}
                       </span>
-                      <span className="flex items-center gap-0.5">
+                      {note.archived ? (
+                        <span className="bg-rose-500/15 border border-rose-500/20 text-rose-500 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide">
+                          Archived
+                        </span>
+                      ) : note.status === "Published" ? (
+                        <span className="bg-indigo-50/80 border border-indigo-200/30 text-indigo-650 dark:bg-indigo-950/20 dark:text-indigo-400 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide font-bold">
+                          Published
+                        </span>
+                      ) : (
+                        <span className="bg-zinc-150/40 border border-zinc-200/20 text-zinc-550 dark:bg-zinc-900/30 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wide font-bold">
+                          Draft
+                        </span>
+                      )}
+                      <span className="flex items-center gap-0.5 ml-1">
                         <BookOpen size={10} />
                         {note.word_count} w
                       </span>
@@ -473,9 +542,22 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
                   </div>
 
                   <div className="flex items-center gap-3 text-[10px] text-zinc-400 flex-shrink-0 font-semibold pl-4">
-                    <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide text-zinc-500">
+                    <span className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200/20 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide text-zinc-550">
                       {note.template}
                     </span>
+                    {note.archived ? (
+                      <span className="bg-rose-500/15 border border-rose-500/20 text-rose-500 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide">
+                        Archived
+                      </span>
+                    ) : note.status === "Published" ? (
+                      <span className="bg-indigo-50/80 border border-indigo-200/30 text-indigo-650 dark:bg-indigo-950/20 dark:text-indigo-400 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold">
+                        Published
+                      </span>
+                    ) : (
+                      <span className="bg-zinc-150/40 border border-zinc-200/20 text-zinc-550 dark:bg-zinc-900/30 px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wide font-bold">
+                        Draft
+                      </span>
+                    )}
                     <span>{note.word_count} w</span>
                     <span className="flex items-center gap-0.5">
                       <Clock size={10} />
@@ -547,6 +629,18 @@ export function NotesWorkspace({ projectSlug, projectId }: NotesWorkspaceProps) 
         onClose={() => setIsCreateOpen(false)}
         onSubmit={handleCreateSubmit}
         loading={createMutation.isPending}
+      />
+
+      {/* Consolidated Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        type={confirmDialog.type}
       />
     </div>
   );

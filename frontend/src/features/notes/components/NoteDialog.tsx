@@ -81,6 +81,17 @@ export function NoteDialog({ isOpen, onClose, onSubmit, loading = false }: NoteD
     }
   }, [isOpen, reset]);
 
+  // Listen for Escape key to dismiss dialog
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !loading) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose, loading]);
+
   const handleFormSubmit = async (data: FormInput) => {
     try {
       await onSubmit(data);
