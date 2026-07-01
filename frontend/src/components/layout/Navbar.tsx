@@ -196,7 +196,9 @@ export function Navbar({ setSidebarOpen, pageTitle = "Dashboard" }: NavbarProps)
           >
             <Bell size={16} />
             {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-600 dark:bg-indigo-500 rounded-full ring-2 ring-white dark:ring-[#08080a] animate-pulse" />
+              <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 bg-rose-600 text-white dark:bg-rose-500 rounded-full ring-1.5 ring-white dark:ring-[#08080a] flex items-center justify-center text-[9px] font-black font-sans leading-none animate-pulse">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
             )}
           </button>
 
