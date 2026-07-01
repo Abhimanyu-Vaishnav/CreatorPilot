@@ -64,13 +64,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         instance.last_opened_at = timezone.now()
         instance.save(update_fields=['last_opened_at'])
         
-        # Auto-record "Project Opened"
-        ProjectActivity.objects.create(
-            project=instance,
-            user=request.user,
-            action="Project Opened"
-        )
-        
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -294,18 +287,6 @@ class NoteViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         instance.last_opened_at = timezone.now()
         instance.save(update_fields=['last_opened_at'])
-
-        # Auto-record activity
-        ProjectActivity.objects.create(
-            project=instance.project,
-            user=request.user,
-            action="Note Opened",
-            metadata={
-                "note_title": instance.title,
-                "note_slug": instance.slug,
-                "note_id": instance.id
-            }
-        )
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
