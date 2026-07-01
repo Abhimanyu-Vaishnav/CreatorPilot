@@ -15,6 +15,7 @@ import {
   ProjectCard,
   useRecentActivityQuery,
 } from "../../features/projects";
+import { useNotesQuery } from "../../features/notes";
 import {
   User,
   ShieldCheck,
@@ -33,6 +34,8 @@ import {
   LayoutDashboard,
   FolderPlus,
   Tag,
+  FileText,
+  Pin,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -80,6 +83,12 @@ function DashboardContent() {
     data: recentActivities,
     isLoading: activitiesLoading,
   } = useRecentActivityQuery();
+
+  // Fetch notes list
+  const {
+    data: allNotes = [],
+    isLoading: notesLoading,
+  } = useNotesQuery();
 
   // Mutations
   const createMutation = useCreateProjectMutation();
@@ -378,6 +387,83 @@ function DashboardContent() {
                           onToggleArchive={handleToggleArchive}
                         />
                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Notes & Drafts Widgets */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="text-indigo-650 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Notes & Drafts</h3>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold px-2 py-0.5 rounded-full">
+                      {allNotes.filter((n) => !n.archived).length} active drafts
+                    </span>
+                  </div>
+
+                  {notesLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : allNotes.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-400">
+                      No notes created yet. Open any project workspace to add your first note.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Pinned Notes card */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Pin size={10} /> Pinned Notes
+                        </span>
+                        
+                        {allNotes.filter((n) => n.pinned && !n.archived).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3 font-semibold">No pinned notes. Pin important drafts to see them here.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {allNotes.filter((n) => n.pinned && !n.archived).slice(0, 3).map((n) => (
+                              <Link
+                                key={n.id}
+                                href={`/dashboard/projects/${n.project_slug}/notes/${n.slug}`}
+                                className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                              >
+                                <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{n.title}</div>
+                                <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{n.project_title} • {n.word_count} words</div>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Recently Edited Notes card */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Clock size={10} /> Recently Edited
+                        </span>
+                        
+                        {allNotes.filter((n) => !n.archived).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3 font-semibold">No recent edits.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {[...allNotes]
+                              .filter((n) => !n.archived)
+                              .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                              .slice(0, 3)
+                              .map((n) => (
+                                <Link
+                                  key={n.id}
+                                  href={`/dashboard/projects/${n.project_slug}/notes/${n.slug}`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{n.title}</div>
+                                  <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{n.project_title} • {n.reading_time} min read</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

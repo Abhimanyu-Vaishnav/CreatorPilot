@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { DashboardLayout } from "../../../../components/layout/DashboardLayout";
 import {
   useProjectQuery,
@@ -16,6 +16,7 @@ import {
 } from "../../../../features/projects";
 import { Breadcrumbs } from "../../../../features/projects/components/Breadcrumbs";
 import { Timeline } from "../../../../features/projects/components/Timeline";
+import { NotesWorkspace, useProjectNotesQuery } from "../../../../features/notes";
 import {
   ArrowLeft,
   Calendar,
@@ -48,9 +49,28 @@ type TabName = "overview" | "notes" | "tasks" | "media" | "vault" | "calendar" |
 export default function ProjectWorkspacePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const slug = params?.slug as string;
 
-  const [activeTab, setActiveTab] = useState<TabName>("overview");
+  const tabParam = searchParams?.get("tab") as TabName;
+  const [activeTab, setActiveTab] = useState<TabName>(
+    (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings"].includes(tabParam))
+      ? tabParam
+      : "overview"
+  );
+
+  // Sync tab state when URL search params change
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab") as TabName;
+    if (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab: TabName) => {
+    setActiveTab(tab);
+    router.push(`/dashboard/projects/${slug}?tab=${tab}`, { scroll: false });
+  };
   
   // Dialog States
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -60,6 +80,7 @@ export default function ProjectWorkspacePage() {
   // Queries
   const { data: project, isLoading: isProjectLoading, isError, error } = useProjectQuery(slug);
   const { data: activities = [], isLoading: isActivityLoading } = useProjectActivityQuery(slug, !!project);
+  const { data: projectNotes = [] } = useProjectNotesQuery(slug, !!project);
 
   // Mutations
   const updateMutation = useUpdateProjectMutation();
@@ -113,9 +134,11 @@ export default function ProjectWorkspacePage() {
     minute: "2-digit",
   });
 
-  const tabs: { id: TabName; label: string; icon: any; lock?: boolean }[] = [
+  const activeNotesCount = projectNotes.filter((n) => !n.archived).length;
+
+  const tabs: { id: TabName; label: string; icon: any; lock?: boolean; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Folder },
-    { id: "notes", label: "Notes", icon: FileText, lock: true },
+    { id: "notes", label: "Notes", icon: FileText, count: activeNotesCount },
     { id: "tasks", label: "Tasks", icon: CheckSquare, lock: true },
     { id: "media", label: "Media Library", icon: Image, lock: true },
     { id: "vault", label: "Knowledge Vault", icon: Database, lock: true },
@@ -267,7 +290,7 @@ export default function ProjectWorkspacePage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={`h-9 px-4 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all whitespace-nowrap ${
                 isActive
                   ? "border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400"
@@ -276,6 +299,11 @@ export default function ProjectWorkspacePage() {
             >
               <Icon size={14} />
               {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className="ml-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
+                  {tab.count}
+                </span>
+              )}
               {tab.lock && (
                 <Lock size={10} className="text-zinc-400 dark:text-zinc-600" />
               )}
@@ -430,7 +458,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-zinc-100 dark:border-zinc-900/20 text-zinc-800 dark:text-zinc-200">
                     <span className="text-zinc-500">Notes Count</span>
-                    <span className="text-zinc-400 text-[10px] uppercase font-bold">Locked</span>
+                    <span>{activeNotesCount} notes</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-zinc-100 dark:border-zinc-900/20 text-zinc-800 dark:text-zinc-200">
                     <span className="text-zinc-500">Tasks Count</span>
@@ -467,6 +495,8 @@ export default function ProjectWorkspacePage() {
 
             </div>
           </div>
+        ) : activeTab === "notes" ? (
+          <NotesWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : (
           /* Placeholder views for locked tabs */
           <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-200/80 dark:border-zinc-800 bg-white/20 dark:bg-[#0e0e11]/25 flex flex-col items-center justify-center max-w-lg mx-auto space-y-4 shadow-sm animate-fadeIn">

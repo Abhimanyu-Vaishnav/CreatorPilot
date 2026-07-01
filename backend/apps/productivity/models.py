@@ -1,3 +1,4 @@
-from .infrastructure.persistence.models import Project
+from .infrastructure.persistence.models import Project, Note
 
-__all__ = ["Project"]
+__all__ = ["Project", "Note"]
+

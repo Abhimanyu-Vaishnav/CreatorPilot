@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..infrastructure.persistence.models import Project, ProjectActivity
+from ..infrastructure.persistence.models import Project, ProjectActivity, Note
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,4 +70,47 @@ class ProjectActivitySerializer(serializers.ModelSerializer):
         if seconds > 60:
             return f"{seconds // 60}m ago"
         return "just now"
+
+
+class NoteSerializer(serializers.ModelSerializer):
+    project_slug = serializers.CharField(source='project.slug', read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    owner_email = serializers.CharField(source='owner.email', read_only=True)
+
+    class Meta:
+        model = Note
+        fields = [
+            'id',
+            'project',
+            'project_slug',
+            'project_title',
+            'owner',
+            'owner_email',
+            'title',
+            'content',
+            'excerpt',
+            'slug',
+            'favorite',
+            'pinned',
+            'archived',
+            'word_count',
+            'reading_time',
+            'color',
+            'template',
+            'last_opened_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id', 
+            'owner', 
+            'slug', 
+            'excerpt', 
+            'word_count', 
+            'reading_time', 
+            'last_opened_at', 
+            'created_at', 
+            'updated_at'
+        ]
+
 
