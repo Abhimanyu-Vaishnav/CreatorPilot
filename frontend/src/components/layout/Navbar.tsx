@@ -37,13 +37,16 @@ export function Navbar({ setSidebarOpen, pageTitle = "Dashboard" }: NavbarProps)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-        // Mark as read when closing dropdown
-        const now = Date.now();
-        setLastViewedTime(now);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("cp_notifications_last_viewed", now.toString());
-        }
+        setDropdownOpen((prevOpen) => {
+          if (prevOpen) {
+            const now = Date.now();
+            setLastViewedTime(now);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("cp_notifications_last_viewed", now.toString());
+            }
+          }
+          return false;
+        });
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
