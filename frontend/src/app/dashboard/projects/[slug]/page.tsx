@@ -17,6 +17,8 @@ import {
 import { Breadcrumbs } from "../../../../features/projects/components/Breadcrumbs";
 import { Timeline } from "../../../../features/projects/components/Timeline";
 import { NotesWorkspace, useProjectNotesQuery } from "../../../../features/notes";
+import { KnowledgeWorkspace, useProjectKnowledgeQuery } from "../../../../features/vault";
+import { TasksWorkspace, useProjectTasksQuery } from "../../../../features/tasks";
 import {
   ArrowLeft,
   Calendar,
@@ -81,6 +83,8 @@ export default function ProjectWorkspacePage() {
   const { data: project, isLoading: isProjectLoading, isError, error } = useProjectQuery(slug);
   const { data: activities = [], isLoading: isActivityLoading } = useProjectActivityQuery(slug, !!project);
   const { data: projectNotes = [] } = useProjectNotesQuery(slug, !!project);
+  const { data: projectKnowledge = [] } = useProjectKnowledgeQuery(slug, undefined, !!project);
+  const { data: projectTasks = [] } = useProjectTasksQuery(slug, !!project);
 
   // Mutations
   const updateMutation = useUpdateProjectMutation();
@@ -91,7 +95,7 @@ export default function ProjectWorkspacePage() {
     return (
       <DashboardLayout>
         <div className="flex flex-col items-center justify-center py-20 space-y-4">
-          <Loader2 className="animate-spin text-indigo-600 dark:text-indigo-400" size={32} />
+          <Loader2 className="animate-spin text-indigo-650" size={32} />
           <p className="text-xs text-zinc-500 font-medium">Opening project workspace...</p>
         </div>
       </DashboardLayout>
@@ -111,7 +115,7 @@ export default function ProjectWorkspacePage() {
         <div className="mt-4">
           <Link
             href="/dashboard/projects"
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 hover:underline"
+            className="text-xs font-semibold text-indigo-650"
           >
             <ArrowLeft size={14} /> Back to Projects
           </Link>
@@ -135,13 +139,15 @@ export default function ProjectWorkspacePage() {
   });
 
   const activeNotesCount = projectNotes.filter((n) => !n.archived).length;
+  const activeKnowledgeCount = projectKnowledge.filter((k) => !k.archived).length;
+  const activeTasksCount = projectTasks.filter((t) => !t.archived).length;
 
   const tabs: { id: TabName; label: string; icon: any; lock?: boolean; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Folder },
     { id: "notes", label: "Notes", icon: FileText, count: activeNotesCount },
-    { id: "tasks", label: "Tasks", icon: CheckSquare, lock: true },
+    { id: "tasks", label: "Tasks", icon: CheckSquare, count: activeTasksCount },
     { id: "media", label: "Media Library", icon: Image, lock: true },
-    { id: "vault", label: "Knowledge Vault", icon: Database, lock: true },
+    { id: "vault", label: "Knowledge Vault", icon: Database, count: activeKnowledgeCount },
     { id: "calendar", label: "Content Calendar", icon: CalendarDays, lock: true },
     { id: "timeline", label: "Activity Timeline", icon: Activity, lock: true },
     { id: "settings", label: "Settings", icon: Settings, lock: true },
@@ -526,7 +532,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div className="flex justify-between items-center py-1.5 border-b border-zinc-100 dark:border-zinc-900/20 text-zinc-800 dark:text-zinc-200">
                     <span className="text-zinc-500">Tasks Count</span>
-                    <span className="text-zinc-400 text-[10px] uppercase font-bold">Locked</span>
+                    <span>{activeTasksCount} tasks</span>
                   </div>
                   <div className="flex justify-between items-center py-1.5 text-zinc-800 dark:text-zinc-200 font-semibold">
                     <span className="text-zinc-500">Media Files</span>
@@ -561,6 +567,10 @@ export default function ProjectWorkspacePage() {
           </div>
         ) : activeTab === "notes" ? (
           <NotesWorkspace projectSlug={project.slug} projectId={project.id} />
+        ) : activeTab === "vault" ? (
+          <KnowledgeWorkspace projectSlug={project.slug} projectId={project.id} />
+        ) : activeTab === "tasks" ? (
+          <TasksWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : (
           /* Placeholder views for locked tabs */
           <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-200/80 dark:border-zinc-800 bg-white/20 dark:bg-[#0e0e11]/25 flex flex-col items-center justify-center max-w-lg mx-auto space-y-4 shadow-sm animate-fadeIn">

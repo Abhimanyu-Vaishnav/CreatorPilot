@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { DashboardLayout } from "../../components/layout/DashboardLayout";
 import { useAuth } from "../../features/identity";
@@ -16,6 +16,8 @@ import {
   useRecentActivityQuery,
 } from "../../features/projects";
 import { useNotesQuery } from "../../features/notes";
+import { useKnowledgeQuery } from "../../features/vault";
+import { useTasksQuery } from "../../features/tasks";
 import {
   User,
   ShieldCheck,
@@ -36,6 +38,10 @@ import {
   Tag,
   FileText,
   Pin,
+  CheckSquare,
+  AlertCircle,
+  CheckCircle2,
+  Calendar,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -89,6 +95,18 @@ function DashboardContent() {
     data: allNotes = [],
     isLoading: notesLoading,
   } = useNotesQuery();
+
+  // Fetch knowledge list
+  const {
+    data: allKnowledge = [],
+    isLoading: knowledgeLoading,
+  } = useKnowledgeQuery();
+
+  // Fetch tasks list
+  const {
+    data: allTasks = [],
+    isLoading: tasksLoading,
+  } = useTasksQuery();
 
   // Mutations
   const createMutation = useCreateProjectMutation();
@@ -192,6 +210,55 @@ function DashboardContent() {
     name,
     count,
   }));
+
+  // Tasks widgets calculations
+  const tasksWidgets = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+    
+    // Today's Tasks
+    const todayTasks = allTasks.filter(
+      (t) => !t.archived && t.due_date && new Date(t.due_date).toDateString() === todayStr
+    );
+
+    // Overdue Tasks
+    const overdueTasks = allTasks.filter(
+      (t) => !t.archived && t.due_date && new Date(t.due_date) < now && t.status !== "Completed"
+    );
+
+    // Recently Completed
+    const recentlyCompleted = [...allTasks]
+      .filter((t) => !t.archived && t.status === "Completed" && t.completed_at)
+      .sort((a, b) => {
+        const aTime = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const bTime = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 5);
+
+    // Upcoming Deadlines (next 7 days, excluding today)
+    const upcomingDeadlines = [...allTasks]
+      .filter((t) => {
+        if (t.archived || t.status === "Completed" || !t.due_date) return false;
+        const due = new Date(t.due_date);
+        const diffTime = due.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return due > now && due.toDateString() !== todayStr && diffDays <= 7;
+      })
+      .sort((a, b) => {
+        const aTime = a.due_date ? new Date(a.due_date).getTime() : 0;
+        const bTime = b.due_date ? new Date(b.due_date).getTime() : 0;
+        return aTime - bTime;
+      })
+      .slice(0, 5);
+
+    return {
+      todayTasks: todayTasks.slice(0, 5),
+      overdueTasks: overdueTasks.slice(0, 5),
+      recentlyCompleted,
+      upcomingDeadlines,
+    };
+  }, [allTasks]);
 
   return (
     <DashboardLayout>
@@ -391,6 +458,129 @@ function DashboardContent() {
                   )}
                 </div>
 
+                {/* Section: Tasks Widgets */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4 font-sans">
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="text-indigo-650 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Task Workspace Overview</h3>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold px-2 py-0.5 rounded-full">
+                      {allTasks.filter((t) => !t.archived && t.status !== "Completed").length} pending tasks
+                    </span>
+                  </div>
+
+                  {tasksLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : allTasks.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-450 font-semibold dark:text-zinc-500">
+                      No tasks found. Open a project workspace and click the Tasks tab to add action items.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Sub-grid 1: Today & Overdue */}
+                      <div className="space-y-4">
+                        {/* Widget: Today's Tasks */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5 dark:text-zinc-500">
+                            <Clock size={11} className="text-indigo-500" /> Today's Action Items
+                          </span>
+                          {tasksWidgets.todayTasks.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No tasks scheduled for today.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {tasksWidgets.todayTasks.map((t) => (
+                                <Link
+                                  key={t.id}
+                                  href={`/dashboard/projects/${t.project_slug}/tasks/${t.id}`}
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-zinc-905 dark:text-zinc-50 truncate flex-1">{t.title}</span>
+                                  <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border border-indigo-500/10 bg-indigo-50/50 text-indigo-500">{t.priority}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Widget: Overdue Tasks */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-rose-50/5 dark:bg-rose-950/5 font-semibold">
+                          <span className="text-[10px] font-bold text-rose-500 dark:text-rose-450 uppercase tracking-wider flex items-center gap-1.5">
+                            <AlertCircle size={11} /> Overdue Warnings
+                          </span>
+                          {tasksWidgets.overdueTasks.length === 0 ? (
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-450 py-1 font-semibold">Great job! No overdue tasks.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {tasksWidgets.overdueTasks.map((t) => (
+                                <Link
+                                  key={t.id}
+                                  href={`/dashboard/projects/${t.project_slug}/tasks/${t.id}`}
+                                  className="flex items-center justify-between p-2 rounded-lg border border-rose-250/20 bg-white dark:bg-[#0c0c0f] hover:border-rose-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-rose-600 dark:text-rose-450 truncate flex-1">{t.title}</span>
+                                  <span className="text-[8px] text-zinc-400 font-semibold">{t.due_date ? new Date(t.due_date).toLocaleDateString() : ""}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sub-grid 2: Upcoming & Completed */}
+                      <div className="space-y-4">
+                        {/* Widget: Upcoming Deadlines */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5 dark:text-zinc-500">
+                            <Calendar size={11} /> Upcoming Deadlines (7 Days)
+                          </span>
+                          {tasksWidgets.upcomingDeadlines.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No upcoming deadlines.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {tasksWidgets.upcomingDeadlines.map((t) => (
+                                <Link
+                                  key={t.id}
+                                  href={`/dashboard/projects/${t.project_slug}/tasks/${t.id}`}
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate flex-1">{t.title}</span>
+                                  <span className="text-[8px] text-zinc-450 font-bold">{t.due_date ? new Date(t.due_date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Widget: Recently Completed */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-450 uppercase tracking-wider flex items-center gap-1.5">
+                            <CheckCircle2 size={11} /> Recently Completed
+                          </span>
+                          {tasksWidgets.recentlyCompleted.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No tasks completed recently.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {tasksWidgets.recentlyCompleted.map((t) => (
+                                <Link
+                                  key={t.id}
+                                  href={`/dashboard/projects/${t.project_slug}/tasks/${t.id}`}
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-zinc-450 dark:text-zinc-550 line-through truncate flex-1">{t.title}</span>
+                                  <span className="text-[8px] text-emerald-500 font-bold">Done</span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Section: Notes & Drafts Widgets */}
                 <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
@@ -464,6 +654,119 @@ function DashboardContent() {
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Knowledge Vault Widgets */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Database className="text-indigo-650 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Knowledge Vault</h3>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold px-2 py-0.5 rounded-full">
+                      {allKnowledge.filter((k) => !k.archived).length} items
+                    </span>
+                  </div>
+
+                  {knowledgeLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : allKnowledge.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-400">
+                      No research materials added yet. Open a project workspace to store articles, checklists or notes in the Knowledge Vault.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Widget 1: Recent Knowledge (Recently Added) */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Plus size={10} /> Recent Additions
+                        </span>
+                        
+                        {allKnowledge.filter((k) => !k.archived).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3">No recent resources.</p>
+                        ) : (
+                          <div className="space-y-2 font-semibold">
+                            {[...allKnowledge]
+                              .filter((k) => !k.archived)
+                              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                              .slice(0, 3)
+                              .map((k) => (
+                                <Link
+                                  key={k.id}
+                                  href={`/dashboard/projects/${k.project_slug}/knowledge/${k.slug}`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{k.title}</div>
+                                  <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{k.project_title} • {k.type}</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Widget 2: Favorite Resources */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Star size={10} /> Starred Favorites
+                        </span>
+                        
+                        {allKnowledge.filter((k) => k.favorite && !k.archived).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3">No starred favorites. Star important resources to see them here.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {allKnowledge
+                              .filter((k) => k.favorite && !k.archived)
+                              .slice(0, 3)
+                              .map((k) => (
+                                <Link
+                                  key={k.id}
+                                  href={`/dashboard/projects/${k.project_slug}/knowledge/${k.slug}`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{k.title}</div>
+                                  <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{k.project_title} • {k.type}</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Widget 3: Recently Viewed */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Clock size={10} /> Recently Viewed
+                        </span>
+                        
+                        {allKnowledge.filter((k) => k.last_opened_at && !k.archived).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3">No recently viewed items.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {[...allKnowledge]
+                              .filter((k) => k.last_opened_at && !k.archived)
+                              .sort((a, b) => {
+                                const aTime = a.last_opened_at ? new Date(a.last_opened_at).getTime() : 0;
+                                const bTime = b.last_opened_at ? new Date(b.last_opened_at).getTime() : 0;
+                                return bTime - aTime;
+                              })
+                              .slice(0, 3)
+                              .map((k) => (
+                                <Link
+                                  key={k.id}
+                                  href={`/dashboard/projects/${k.project_slug}/knowledge/${k.slug}`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{k.title}</div>
+                                  <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{k.project_title} • {k.type}</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                   )}
                 </div>
