@@ -339,7 +339,7 @@ export function KnowledgeItemDialog({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="h-9 px-4 rounded-xl bg-indigo-650 hover:bg-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-md shadow-indigo-500/10 transition-all disabled:opacity-60"
+                  className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center justify-center gap-2 shadow-md shadow-indigo-500/10 transition-all disabled:opacity-60"
                 >
                   {loading ? (
                     <>

@@ -86,7 +86,7 @@ export function KnowledgeCard({
           {item.pinned && (
             <button
               onClick={handlePinClick}
-              className="p-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-indigo-650 dark:text-indigo-400"
+              className="p-1 rounded hover:bg-zinc-50 dark:hover:bg-zinc-900 text-indigo-600 dark:text-indigo-400"
               title="Pinned to top"
             >
               <Pin size={12} className="fill-indigo-500/20" />
@@ -160,7 +160,7 @@ export function KnowledgeCard({
       <div className="flex-1 min-w-0 mt-3.5 space-y-1">
         <Link
           href={`/dashboard/projects/${projectSlug}/knowledge/${item.slug}`}
-          className="font-bold text-xs text-zinc-950 dark:text-zinc-50 hover:text-indigo-650 dark:hover:text-indigo-400 transition-colors truncate block"
+          className="font-bold text-xs text-zinc-950 dark:text-zinc-50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate block"
         >
           {item.title}
         </Link>

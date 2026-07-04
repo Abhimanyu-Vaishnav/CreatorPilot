@@ -215,7 +215,7 @@ export function KnowledgeWorkspace({ projectSlug, projectId }: KnowledgeWorkspac
             onClick={() => setShowFilters(!showFilters)}
             className={`h-9 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-bold transition-all ${
               showFilters || hasActiveFilters
-                ? "border-indigo-650 bg-indigo-500/5 text-indigo-600 dark:text-indigo-400"
+                ? "border-indigo-600 bg-indigo-500/5 text-indigo-600 dark:text-indigo-400"
                 : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-700 dark:text-zinc-300"
             }`}
           >
@@ -270,7 +270,7 @@ export function KnowledgeWorkspace({ projectSlug, projectId }: KnowledgeWorkspac
 
           <button
             onClick={() => setIsCreateOpen(true)}
-            className="h-9 px-4 rounded-xl bg-indigo-650 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/10 active:scale-[0.98] transition-all"
+            className="h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-600/10 active:scale-[0.98] transition-all"
           >
             <Plus size={14} />
             Add Resource
@@ -386,7 +386,7 @@ export function KnowledgeWorkspace({ projectSlug, projectId }: KnowledgeWorkspac
               onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
               className={`px-3 py-1 rounded-full text-[10px] border flex-shrink-0 transition-all ${
                 tag === selectedTag
-                  ? "bg-indigo-650 border-indigo-650 text-white dark:bg-indigo-400 dark:border-indigo-400 dark:text-zinc-950"
+                  ? "bg-indigo-600 border-indigo-600 text-white dark:bg-indigo-400 dark:border-indigo-400 dark:text-zinc-950"
                   : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
               }`}
             >
@@ -434,7 +434,7 @@ export function KnowledgeWorkspace({ projectSlug, projectId }: KnowledgeWorkspac
                 setIsCreateOpen(true);
               }
             }}
-            className="h-10 px-5 rounded-xl bg-indigo-650 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/10 active:scale-[0.98] transition-all flex items-center gap-1.5"
+            className="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs shadow-md shadow-indigo-600/10 active:scale-[0.98] transition-all flex items-center gap-1.5"
           >
             {hasActiveFilters ? (
               "Clear Search Filters"
@@ -486,7 +486,7 @@ export function KnowledgeWorkspace({ projectSlug, projectId }: KnowledgeWorkspac
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/dashboard/projects/${projectSlug}/knowledge/${item.slug}`}
-                        className="font-bold text-xs text-zinc-900 dark:text-zinc-50 hover:text-indigo-650 truncate"
+                        className="font-bold text-xs text-zinc-900 dark:text-zinc-50 hover:text-indigo-600 truncate"
                       >
                         {item.title}
                       </Link>
