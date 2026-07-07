@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from ..infrastructure.persistence.models import Project, ProjectActivity, Note, KnowledgeItem, Task
+from ..infrastructure.persistence.models import Project, ProjectActivity, Note, KnowledgeItem, Task, CalendarEvent, Document
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -242,6 +243,120 @@ class TaskSerializer(serializers.ModelSerializer):
         if value not in valid_priorities:
             raise serializers.ValidationError(f"Invalid priority. Must be one of {valid_priorities}")
         return value
+
+
+class CalendarEventSerializer(serializers.ModelSerializer):
+    project_slug = serializers.CharField(source='project.slug', read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    task_title = serializers.CharField(source='related_task.title', read_only=True)
+
+    class Meta:
+        model = CalendarEvent
+        fields = [
+            'id',
+            'owner',
+            'project',
+            'project_slug',
+            'project_title',
+            'related_task',
+            'task_title',
+            'title',
+            'description',
+            'start_datetime',
+            'end_datetime',
+            'all_day',
+            'color',
+            'event_type',
+            'reminder_minutes',
+            'archived',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        start = data.get("start_datetime")
+        end = data.get("end_datetime")
+        if start and end and start > end:
+            raise serializers.ValidationError("End date/time must be after start date/time.")
+        return data
+
+    def validate_event_type(self, value):
+        valid_types = [choice[0] for choice in CalendarEvent.EVENT_TYPE_CHOICES]
+        if value not in valid_types:
+            raise serializers.ValidationError(f"Invalid event type. Must be one of {valid_types}")
+        return value
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    project_slug = serializers.CharField(source='project.slug', read_only=True)
+    project_title = serializers.CharField(source='project.title', read_only=True)
+    owner_email = serializers.CharField(source='owner.email', read_only=True)
+
+    class Meta:
+        model = Document
+        fields = [
+            'id',
+            'project',
+            'project_slug',
+            'project_title',
+            'owner',
+            'owner_email',
+            'title',
+            'content',
+            'excerpt',
+            'slug',
+            'status',
+            'visibility',
+            'cover_image',
+            'template',
+            'archived',
+            'word_count',
+            'reading_time',
+            'last_opened_at',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = [
+            'id',
+            'owner',
+            'slug',
+            'excerpt',
+            'word_count',
+            'reading_time',
+            'last_opened_at',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate_title(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Title cannot be empty")
+        if len(value) > 100:
+            raise serializers.ValidationError("Title cannot exceed 100 characters")
+        return value
+
+    def validate_status(self, value):
+        valid_statuses = [choice[0] for choice in Document.STATUS_CHOICES]
+        if value not in valid_statuses:
+            raise serializers.ValidationError(f"Invalid status. Must be one of {valid_statuses}")
+        return value
+
+    def validate_visibility(self, value):
+        valid_visibilities = [choice[0] for choice in Document.VISIBILITY_CHOICES]
+        if value not in valid_visibilities:
+            raise serializers.ValidationError(f"Invalid visibility. Must be one of {valid_visibilities}")
+        return value
+
+    def validate(self, data):
+        project = data.get("project")
+        if project and self.context.get('request'):
+            user = self.context['request'].user
+            if project.owner != user:
+                raise serializers.ValidationError({"project": "Invalid project or you do not have permission."})
+        return data
+
+
 
 
 

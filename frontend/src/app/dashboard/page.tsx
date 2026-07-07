@@ -18,7 +18,10 @@ import {
 import { useNotesQuery } from "../../features/notes";
 import { useKnowledgeQuery } from "../../features/vault";
 import { useTasksQuery } from "../../features/tasks";
+import { useCalendarEventsQuery } from "../../features/planner";
+import { useDocumentsQuery } from "../../features/studio";
 import {
+
   User,
   ShieldCheck,
   Database,
@@ -107,6 +110,21 @@ function DashboardContent() {
     data: allTasks = [],
     isLoading: tasksLoading,
   } = useTasksQuery();
+
+  // Fetch calendar events
+  const {
+    data: calendarEvents = [],
+    isLoading: calendarLoading,
+  } = useCalendarEventsQuery();
+
+  // Fetch documents list
+  const {
+    data: allDocuments = [],
+    isLoading: documentsLoading,
+  } = useDocumentsQuery();
+
+  const activeDocs = allDocuments.filter((d) => !d.archived);
+
 
   // Mutations
   const createMutation = useCreateProjectMutation();
@@ -259,6 +277,50 @@ function DashboardContent() {
       upcomingDeadlines,
     };
   }, [allTasks]);
+
+  // Calendar planner widgets calculations
+  const plannerWidgets = useMemo(() => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+
+    const todayEvents = calendarEvents.filter((e) => {
+      if (!e.start_datetime) return false;
+      const start = new Date(e.start_datetime);
+      const end = e.end_datetime ? new Date(e.end_datetime) : start;
+      return (
+        start.toDateString() === todayStr ||
+        end.toDateString() === todayStr ||
+        (start <= now && end >= now)
+      );
+    });
+
+    const upcomingEvents = calendarEvents
+      .filter((e) => {
+        if (!e.start_datetime) return false;
+        const start = new Date(e.start_datetime);
+        return start > now && start.toDateString() !== todayStr;
+      })
+      .slice(0, 5);
+
+    const endOfWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const thisWeekEvents = calendarEvents.filter((e) => {
+      if (!e.start_datetime) return false;
+      const start = new Date(e.start_datetime);
+      return start >= now && start <= endOfWeek;
+    });
+
+    const projectMilestones = calendarEvents
+      .filter((e) => e.event_type === "Milestone")
+      .slice(0, 5);
+
+    return {
+      todayEvents: todayEvents.slice(0, 5),
+      upcomingEvents,
+      thisWeekEvents,
+      projectMilestones,
+    };
+  }, [calendarEvents]);
+
 
   return (
     <DashboardLayout>
@@ -458,8 +520,155 @@ function DashboardContent() {
                   )}
                 </div>
 
+                {/* Section: Content Planner & Schedule */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4 font-sans">
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="text-indigo-650 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Content Planner & Schedule</h3>
+                    </div>
+                    <Link
+                      href="/dashboard/planner"
+                      className="text-[10px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 font-bold flex items-center gap-0.5 transition-colors"
+                    >
+                      Open Planner →
+                    </Link>
+                  </div>
+
+                  {calendarLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : calendarEvents.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-450 dark:text-zinc-550 font-semibold">
+                      No calendar events scheduled. Click Open Planner to configure.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Sub-grid 1: Today's Schedule & Milestones */}
+                      <div className="space-y-4">
+                        {/* Widget: Today's Schedule */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5 dark:text-zinc-500">
+                            <Clock size={11} className="text-indigo-500" /> Today's Schedule
+                          </span>
+                          {plannerWidgets.todayEvents.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No events scheduled for today.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {plannerWidgets.todayEvents.map((e) => (
+                                <Link
+                                  key={e.id}
+                                  href={String(e.id).startsWith("task_") ? `/dashboard/projects/${e.project_slug}/tasks/${e.related_task}` : "/dashboard/planner"}
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="flex flex-col min-w-0 flex-1 pr-2">
+                                    <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate">{e.title}</span>
+                                    <span className="text-[8px] text-zinc-450 mt-0.5 font-bold">
+                                      {e.start_datetime ? new Date(e.start_datetime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "All Day"}
+                                    </span>
+                                  </div>
+                                  <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border border-indigo-500/10 bg-indigo-50/50 text-indigo-500 shrink-0">
+                                    {e.event_type}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Widget: Project Milestones */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Bookmark size={11} className="fill-amber-500/10" /> Key Milestones
+                          </span>
+                          {plannerWidgets.projectMilestones.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No active milestones configured.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {plannerWidgets.projectMilestones.map((e) => (
+                                <Link
+                                  key={e.id}
+                                  href="/dashboard/planner"
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-amber-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-550 truncate block">{e.title}</span>
+                                    {e.project_title && (
+                                      <span className="text-[8px] text-indigo-500 uppercase tracking-wider font-bold block mt-0.5">
+                                        {e.project_title}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[8px] text-zinc-450 font-bold shrink-0">
+                                    {e.start_datetime ? new Date(e.start_datetime).toLocaleDateString() : ""}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sub-grid 2: Upcoming & This Week */}
+                      <div className="space-y-4">
+                        {/* Widget: This Week */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5 dark:text-zinc-500">
+                            <Calendar size={11} className="text-indigo-500" /> Agenda (This Week)
+                          </span>
+                          {plannerWidgets.thisWeekEvents.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No events scheduled for this week.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {plannerWidgets.thisWeekEvents.slice(0, 3).map((e) => (
+                                <Link
+                                  key={e.id}
+                                  href="/dashboard/planner"
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate flex-1">{e.title}</span>
+                                  <span className="text-[8px] text-zinc-450 font-bold shrink-0">
+                                    {e.start_datetime ? new Date(e.start_datetime).toLocaleDateString(undefined, { weekday: "short" }) : ""}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Widget: Upcoming Events */}
+                        <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold">
+                          <span className="text-[10px] font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5 dark:text-zinc-500">
+                            <Calendar size={11} /> Upcoming Releases (14 Days)
+                          </span>
+                          {plannerWidgets.upcomingEvents.length === 0 ? (
+                            <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-1 font-semibold">No upcoming events scheduled.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {plannerWidgets.upcomingEvents.map((e) => (
+                                <Link
+                                  key={e.id}
+                                  href="/dashboard/planner"
+                                  className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <span className="text-[11px] font-bold text-zinc-900 dark:text-zinc-50 truncate flex-1">{e.title}</span>
+                                  <span className="text-[8px] text-zinc-450 font-bold shrink-0">
+                                    {e.start_datetime ? new Date(e.start_datetime).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                                  </span>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* Section: Tasks Widgets */}
                 <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4 font-sans">
+
                   <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
                     <div className="flex items-center gap-2">
                       <CheckSquare className="text-indigo-650 dark:text-indigo-400" size={16} />
@@ -576,6 +785,86 @@ function DashboardContent() {
                             </div>
                           )}
                         </div>
+                      </div>
+                    </div>
+                  )}
+                </div>                {/* Section: Writing Studio Widgets */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-150 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <FileText className="text-indigo-600 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-550">Writing Studio Docs</h3>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold px-2 py-0.5 rounded-full">
+                      {activeDocs.length} documents
+                    </span>
+                  </div>
+
+                  {documentsLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : activeDocs.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-450 dark:text-zinc-550 font-semibold">
+                      No documents created yet. Open a workspace and choose Writing Studio to add a document.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-semibold text-xs">
+                      {/* Sub-card 1: Drafts & Review */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <FileText size={10} className="text-amber-500" /> Drafts & Review
+                        </span>
+                        
+                        {activeDocs.filter((d) => d.status !== "Published").length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3 italic">No current drafts.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {activeDocs
+                              .filter((d) => d.status !== "Published")
+                              .slice(0, 3)
+                              .map((d) => (
+                                <Link
+                                  key={d.id}
+                                  href={`/dashboard/projects/${d.project_slug}?tab=writing`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-550 truncate">{d.title}</div>
+                                  <div className="text-[9px] text-zinc-450 dark:text-zinc-500 mt-0.5 flex justify-between">
+                                    <span>{d.project_title} • {d.word_count} words</span>
+                                    <span className="text-amber-500 font-extrabold uppercase text-[8px]">{d.status}</span>
+                                  </div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Sub-card 2: Recently Edited */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+                          <Clock size={10} className="text-indigo-555" /> Recently Edited
+                        </span>
+                        
+                        {activeDocs.length === 0 ? (
+                          <p className="text-[10px] text-zinc-455 dark:text-zinc-555 py-3 italic font-medium">No edits recorded.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {[...activeDocs]
+                              .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                              .slice(0, 3)
+                              .map((d) => (
+                                <Link
+                                  key={d.id}
+                                  href={`/dashboard/projects/${d.project_slug}?tab=writing`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-550 truncate">{d.title}</div>
+                                  <div className="text-[9px] text-zinc-450 dark:text-zinc-500 mt-0.5 truncate">{d.project_title} • {d.reading_time} min read</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

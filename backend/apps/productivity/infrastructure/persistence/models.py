@@ -335,5 +335,147 @@ class Task(models.Model):
         return self.title
 
 
+class CalendarEvent(models.Model):
+    EVENT_TYPE_CHOICES = [
+        ("Task", "Task"),
+        ("Milestone", "Milestone"),
+        ("Meeting", "Meeting"),
+        ("Content Plan", "Content Plan"),
+        ("Reminder", "Reminder"),
+        ("Personal", "Personal"),
+    ]
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="calendar_events"
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="calendar_events"
+    )
+    related_task = models.ForeignKey(
+        Task,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calendar_events"
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default="")
+    start_datetime = models.DateTimeField()
+    end_datetime = models.DateTimeField()
+    all_day = models.BooleanField(default=False)
+    color = models.CharField(max_length=50, default="#6366f1")
+    event_type = models.CharField(max_length=50, choices=EVENT_TYPE_CHOICES, default="Content Plan")
+    reminder_minutes = models.IntegerField(default=0)
+    archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start_datetime"]
+
+    def __str__(self):
+        return self.title
+
+
+class Document(models.Model):
+    STATUS_CHOICES = [
+        ("Draft", "Draft"),
+        ("Review", "Review"),
+        ("Published", "Published"),
+    ]
+    
+    VISIBILITY_CHOICES = [
+        ("Private", "Private"),
+        ("Workspace", "Workspace"),
+    ]
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="documents"
+    )
+    title = models.CharField(max_length=255)
+    content = models.TextField(blank=True, default="")
+    excerpt = models.TextField(blank=True, default="")
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default="Draft")
+    visibility = models.CharField(max_length=50, choices=VISIBILITY_CHOICES, default="Private")
+    cover_image = models.CharField(max_length=500, blank=True, default="")
+    template = models.CharField(max_length=50, default="Blank")
+    archived = models.BooleanField(default=False)
+    word_count = models.IntegerField(default=0)
+    reading_time = models.IntegerField(default=0)
+    last_opened_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        import re
+
+        # Validation
+        if not self.title or not self.title.strip():
+            raise ValidationError("Title cannot be empty")
+        if len(self.title) > 100:
+            raise ValidationError("Title cannot exceed 100 characters")
+
+        # Initialize template content if empty and template is set
+        if not self.content and self.template and self.template != "Blank":
+            templates = {
+                "Blog Article": "# Blog Article: [Title]\n\n## Executive Summary\n- **Target Audience**:\n- **SEO Keywords**:\n- **Key Takeaways**:\n\n## Introduction\n\n## Core Section 1\n\n## Core Section 2\n\n## Conclusion & CTA",
+                "YouTube Script": "# YouTube Script: [Topic]\n\n- **Target Duration**: \n- **Key Value Prop**: \n\n## Hook (0:00 - 0:30)\n\n## Intro (0:30 - 1:00)\n\n## Main Body (1:00 - 8:00)\n- **Point 1**:\n- **Point 2**:\n- **Point 3**:\n\n## Outro & CTA (8:00 - 9:00)",
+                "Pinterest Pin Copy": "# Pinterest Pin Copy\n\n- **Target Board**: \n- **Visual Concept**: \n\n## Board Title Suggestions\n- \n\n## Description Suggestions\n- \n\n## Destination URL\n- \n\n## Relevant Hashtags\n- ",
+                "Newsletter": "# Newsletter Issue\n\n- **Subject Line**: \n- **Preview Text**: \n- **Sent Date**: \n\n## Introduction\n\n## Main Story\n\n## Industry News / Updates\n- \n\n## Call to Action",
+                "Course Outline": "# Course Outline: [Course Name]\n\n- **Target Student**: \n- **Prerequisites**: \n\n## Module 1: Introduction\n- **Lesson 1.1**:\n- **Lesson 1.2**:\n\n## Module 2: Core Concepts\n- **Lesson 2.1**:\n- **Lesson 2.2**:\n\n## Module 3: Hands-on Practice\n- **Lesson 3.1**:\n- **Lesson 3.2**:\n\n## Conclusion",
+                "Podcast Outline": "# Podcast Outline: [Episode Name]\n\n- **Episode Number**: \n- **Guest**: \n- **Sponsor Message**: \n\n## Introduction & Hook\n\n## Segment 1: Discussion\n\n## Segment 2: Deep Dive\n\n## Wrap-up & Outro",
+            }
+            self.content = templates.get(self.template, "")
+
+        # Generate slug if empty
+        if not self.slug:
+            base_slug = slugify(self.title)
+            if not base_slug:
+                base_slug = "document"
+            slug = base_slug
+            counter = 1
+            while Document.objects.filter(slug=slug).exclude(id=self.id).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        else:
+            if not re.match(r"^[a-z0-9-_]+$", self.slug):
+                raise ValidationError("Invalid slug format. Slugs can only contain lowercase letters, numbers, hyphens, and underscores.")
+
+        # Calculate statistics
+        words = len(self.content.split())
+        self.word_count = words
+        self.reading_time = max(1, (words + 199) // 200) if words > 0 else 0
+        
+        # Calculate excerpt from content
+        clean_content = self.content.replace("#", "").replace("*", "").replace("-", "").strip()
+        self.excerpt = clean_content[:150] + "..." if len(clean_content) > 150 else clean_content
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+
+
+
 
 

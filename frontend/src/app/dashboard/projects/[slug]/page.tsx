@@ -19,6 +19,9 @@ import { Timeline } from "../../../../features/projects/components/Timeline";
 import { NotesWorkspace, useProjectNotesQuery } from "../../../../features/notes";
 import { KnowledgeWorkspace, useProjectKnowledgeQuery } from "../../../../features/vault";
 import { TasksWorkspace, useProjectTasksQuery } from "../../../../features/tasks";
+import { CalendarWorkspace } from "../../../../features/planner";
+import { WritingWorkspace, useProjectDocumentsQuery } from "../../../../features/studio";
+
 import {
   ArrowLeft,
   Calendar,
@@ -46,7 +49,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-type TabName = "overview" | "notes" | "tasks" | "media" | "vault" | "calendar" | "timeline" | "settings";
+type TabName = "overview" | "notes" | "tasks" | "media" | "vault" | "calendar" | "timeline" | "settings" | "writing";
 
 export default function ProjectWorkspacePage() {
   const params = useParams();
@@ -56,7 +59,7 @@ export default function ProjectWorkspacePage() {
 
   const tabParam = searchParams?.get("tab") as TabName;
   const [activeTab, setActiveTab] = useState<TabName>(
-    (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings"].includes(tabParam))
+    (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings", "writing"].includes(tabParam))
       ? tabParam
       : "overview"
   );
@@ -64,7 +67,7 @@ export default function ProjectWorkspacePage() {
   // Sync tab state when URL search params change
   useEffect(() => {
     const tabParam = searchParams?.get("tab") as TabName;
-    if (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings"].includes(tabParam)) {
+    if (tabParam && ["overview", "notes", "tasks", "media", "vault", "calendar", "timeline", "settings", "writing"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -85,6 +88,7 @@ export default function ProjectWorkspacePage() {
   const { data: projectNotes = [] } = useProjectNotesQuery(slug, !!project);
   const { data: projectKnowledge = [] } = useProjectKnowledgeQuery(slug, undefined, !!project);
   const { data: projectTasks = [] } = useProjectTasksQuery(slug, !!project);
+  const { data: projectDocuments = [] } = useProjectDocumentsQuery(slug, !!project);
 
   // Mutations
   const updateMutation = useUpdateProjectMutation();
@@ -141,14 +145,16 @@ export default function ProjectWorkspacePage() {
   const activeNotesCount = projectNotes.filter((n) => !n.archived).length;
   const activeKnowledgeCount = projectKnowledge.filter((k) => !k.archived).length;
   const activeTasksCount = projectTasks.filter((t) => !t.archived).length;
+  const activeDocumentsCount = projectDocuments.filter((d) => !d.archived).length;
 
   const tabs: { id: TabName; label: string; icon: any; lock?: boolean; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Folder },
+    { id: "writing", label: "Writing Studio", icon: Edit, count: activeDocumentsCount },
     { id: "notes", label: "Notes", icon: FileText, count: activeNotesCount },
     { id: "tasks", label: "Tasks", icon: CheckSquare, count: activeTasksCount },
     { id: "media", label: "Media Library", icon: Image, lock: true },
     { id: "vault", label: "Knowledge Vault", icon: Database, count: activeKnowledgeCount },
-    { id: "calendar", label: "Content Calendar", icon: CalendarDays, lock: true },
+    { id: "calendar", label: "Content Calendar", icon: CalendarDays },
     { id: "timeline", label: "Activity Timeline", icon: Activity, lock: true },
     { id: "settings", label: "Settings", icon: Settings, lock: true },
   ];
@@ -565,13 +571,18 @@ export default function ProjectWorkspacePage() {
 
             </div>
           </div>
+        ) : activeTab === "writing" ? (
+          <WritingWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : activeTab === "notes" ? (
           <NotesWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : activeTab === "vault" ? (
           <KnowledgeWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : activeTab === "tasks" ? (
           <TasksWorkspace projectSlug={project.slug} projectId={project.id} />
+        ) : activeTab === "calendar" ? (
+          <CalendarWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : (
+
           /* Placeholder views for locked tabs */
           <div className="p-12 text-center rounded-2xl border border-dashed border-zinc-200/80 dark:border-zinc-800 bg-white/20 dark:bg-[#0e0e11]/25 flex flex-col items-center justify-center max-w-lg mx-auto space-y-4 shadow-sm animate-fadeIn">
             <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-400 dark:text-zinc-600 shadow-inner">

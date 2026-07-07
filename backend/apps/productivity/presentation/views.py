@@ -3,8 +3,11 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.db.models import Q
 from django.utils import timezone
-from ..infrastructure.persistence.models import Project, ProjectActivity, Note, KnowledgeItem, Task
-from .serializers import ProjectSerializer, ProjectActivitySerializer, NoteSerializer, KnowledgeItemSerializer, TaskSerializer
+from ..infrastructure.persistence.models import Project, ProjectActivity, Note, KnowledgeItem, Task, CalendarEvent, Document
+from .serializers import ProjectSerializer, ProjectActivitySerializer, NoteSerializer, KnowledgeItemSerializer, TaskSerializer, CalendarEventSerializer, DocumentSerializer
+from django.utils.dateparse import parse_datetime
+from datetime import timedelta
+
 
 class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
@@ -277,6 +280,54 @@ class ProjectViewSet(viewsets.ModelViewSet):
             notes = notes.order_by("-pinned", "-favorite", "-updated_at")
             
         serializer = NoteSerializer(notes, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='documents')
+    def documents(self, request, slug=None):
+        project = self.get_object()
+        documents = project.documents.filter(owner=request.user)
+        
+        # Archived filter
+        archived = request.query_params.get("archived")
+        if archived is not None:
+            if archived.lower() == "true":
+                documents = documents.filter(archived=True)
+            elif archived.lower() == "false":
+                documents = documents.filter(archived=False)
+        else:
+            documents = documents.filter(archived=False)
+        
+        # Apply filters
+        status_param = request.query_params.get("status")
+        if status_param:
+            documents = documents.filter(status=status_param)
+            
+        visibility_param = request.query_params.get("visibility")
+        if visibility_param:
+            documents = documents.filter(visibility=visibility_param)
+            
+        search = request.query_params.get("search")
+        if search:
+            documents = documents.filter(
+                Q(title__icontains=search) | Q(content__icontains=search) | Q(slug__icontains=search)
+            )
+            
+        ordering = request.query_params.get("ordering")
+        if ordering:
+            allowed_fields = [
+                "title", "-title",
+                "created_at", "-created_at",
+                "updated_at", "-updated_at",
+                "last_opened_at", "-last_opened_at"
+            ]
+            if ordering in allowed_fields:
+                documents = documents.order_by(ordering)
+            else:
+                documents = documents.order_by("-updated_at")
+        else:
+            documents = documents.order_by("-updated_at")
+            
+        serializer = DocumentSerializer(documents, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get', 'post'], url_path='tasks')
@@ -818,5 +869,498 @@ class TaskViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Tasks reordered successfully."})
 
 
+class CalendarViewSet(viewsets.ModelViewSet):
+    serializer_class = CalendarEventSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CalendarEvent.objects.filter(owner=self.request.user)
+
+    def _format_task_as_event(self, task):
+        # Fallback start time is 1 hour before due date if start_date is not set
+        start_dt = task.start_date
+        if not start_dt and task.due_date:
+            start_dt = task.due_date - timedelta(hours=1)
+        
+        return {
+            "id": f"task_{task.id}",
+            "owner": task.owner_id,
+            "project": task.project_id,
+            "project_slug": task.project.slug if task.project else None,
+            "project_title": task.project.title if task.project else None,
+            "related_task": task.id,
+            "task_title": task.title,
+            "title": task.title,
+            "description": task.description,
+            "start_datetime": start_dt.isoformat() if start_dt else None,
+            "end_datetime": task.due_date.isoformat() if task.due_date else None,
+            "all_day": False,
+            "color": "#f59e0b" if task.priority in ["High", "Urgent"] else "#3b82f6",
+            "event_type": "Task",
+            "task_status": task.status,
+            "reminder_minutes": 0,
+            "archived": task.archived,
+            "created_at": task.created_at.isoformat(),
+            "updated_at": task.updated_at.isoformat(),
+        }
+
+    def list(self, request, *args, **kwargs):
+        # 1. Parse date filters
+        start_param = request.query_params.get("start_date") or request.query_params.get("start")
+        end_param = request.query_params.get("end_date") or request.query_params.get("end")
+        
+        start_dt = parse_datetime(start_param) if start_param else None
+        end_dt = parse_datetime(end_param) if end_param else None
+
+        # Base queries
+        event_qs = CalendarEvent.objects.filter(owner=request.user)
+        task_qs = Task.objects.filter(owner=request.user, due_date__isnull=False)
+
+        # 1.5 Archived filter
+        archived_param = request.query_params.get("archived")
+        if archived_param is not None:
+            is_archived = archived_param.lower() == "true"
+            event_qs = event_qs.filter(archived=is_archived)
+            task_qs = task_qs.filter(archived=is_archived)
+        else:
+            event_qs = event_qs.filter(archived=False)
+            task_qs = task_qs.filter(archived=False)
+
+        # 2. Date filters
+        if start_dt and end_dt:
+            # Overlapping events: event start < end_dt AND event end > start_dt
+            event_qs = event_qs.filter(start_datetime__lt=end_dt, end_datetime__gt=start_dt)
+            task_qs = task_qs.filter(due_date__gte=start_dt, due_date__lte=end_dt)
+        elif start_dt:
+            event_qs = event_qs.filter(end_datetime__gte=start_dt)
+            task_qs = task_qs.filter(due_date__gte=start_dt)
+        elif end_dt:
+            event_qs = event_qs.filter(start_datetime__lte=end_dt)
+            task_qs = task_qs.filter(due_date__lte=end_dt)
+
+        # 3. Project filter (slug or ID)
+        project_param = request.query_params.get("project")
+        if project_param:
+            if project_param.isdigit():
+                event_qs = event_qs.filter(project_id=project_param)
+                task_qs = task_qs.filter(project_id=project_param)
+            else:
+                event_qs = event_qs.filter(project__slug=project_param)
+                task_qs = task_qs.filter(project__slug=project_param)
+
+        # 4. Search query
+        search_param = request.query_params.get("search")
+        if search_param:
+            event_qs = event_qs.filter(
+                Q(title__icontains=search_param) | Q(description__icontains=search_param)
+            )
+            task_qs = task_qs.filter(
+                Q(title__icontains=search_param) | Q(description__icontains=search_param)
+            )
+
+        # 5. Type filtering
+        type_param = request.query_params.get("event_type")
+        if type_param:
+            if type_param == "Task":
+                event_qs = event_qs.none()
+            else:
+                event_qs = event_qs.filter(event_type=type_param)
+                task_qs = task_qs.none()
+
+        # Feature 9: specific helper filters
+        today_filter = request.query_params.get("today")
+        if today_filter and today_filter.lower() == "true":
+            from django.utils import timezone
+            now = timezone.now()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            event_qs = event_qs.filter(start_datetime__lt=today_end, end_datetime__gt=today_start)
+            task_qs = task_qs.filter(due_date__range=(today_start, today_end))
+
+        upcoming_filter = request.query_params.get("upcoming")
+        if upcoming_filter and upcoming_filter.lower() == "true":
+            from django.utils import timezone
+            now = timezone.now()
+            event_qs = event_qs.filter(start_datetime__gt=now)
+            task_qs = task_qs.filter(due_date__gt=now)
+
+        completed_tasks_filter = request.query_params.get("completed_tasks")
+        if completed_tasks_filter is not None:
+            if completed_tasks_filter.lower() == "true":
+                # We only show completed tasks
+                event_qs = event_qs.none()
+                task_qs = task_qs.filter(status="Completed")
+            else:
+                # Exclude completed tasks
+                task_qs = task_qs.exclude(status="Completed")
+
+        # Fetch and serialize
+        events = event_qs.select_related("project", "related_task")
+        serialized_events = CalendarEventSerializer(events, many=True).data
+
+        tasks = task_qs.select_related("project")
+        # Exclude tasks that are already linked to a CalendarEvent
+        linked_task_ids = set(CalendarEvent.objects.filter(owner=request.user, related_task__isnull=False).values_list("related_task_id", flat=True))
+        serialized_tasks = [
+            self._format_task_as_event(t)
+            for t in tasks
+            if t.id not in linked_task_ids
+        ]
+
+        # Merge results
+        merged = serialized_events + serialized_tasks
+        
+        # Sort by start_datetime
+        def get_start_key(item):
+            val = item.get("start_datetime")
+            return val if val else ""
+            
+        merged.sort(key=get_start_key)
+
+        # Pagination support
+        page = self.paginate_queryset(merged)
+        if page is not None:
+            return self.get_paginated_response(page)
+
+        return Response(merged)
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        if pk and str(pk).startswith("task_"):
+            try:
+                task_id = int(str(pk).split("_")[1])
+                task = Task.objects.select_related("project").get(id=task_id, owner=request.user)
+                return Response(self._format_task_as_event(task))
+            except (ValueError, IndexError, Task.DoesNotExist):
+                return Response({"detail": "Task event not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            event = CalendarEvent.objects.select_related("project", "related_task").get(id=pk, owner=request.user)
+            serializer = CalendarEventSerializer(event)
+            return Response(serializer.data)
+        except CalendarEvent.DoesNotExist:
+            return Response({"detail": "Calendar event not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def perform_create(self, serializer):
+        instance = serializer.save(owner=self.request.user)
+        
+        # Log to ProjectActivity if project exists
+        if instance.project:
+            ProjectActivity.objects.create(
+                project=instance.project,
+                user=self.request.user,
+                action="Event Created",
+                metadata={
+                    "event_title": instance.title,
+                    "event_id": instance.id,
+                    "event_type": instance.event_type
+                }
+            )
+
+    def update(self, request, pk=None, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        
+        if pk and str(pk).startswith("task_"):
+            try:
+                task_id = int(str(pk).split("_")[1])
+                task = Task.objects.select_related("project").get(id=task_id, owner=request.user)
+                
+                old_status = task.status
+                old_due_date = task.due_date
+                old_archived = task.archived
+                
+                # Update task fields from request data
+                title = request.data.get("title")
+                description = request.data.get("description")
+                task_status = request.data.get("task_status") or request.data.get("status")
+                start_datetime = request.data.get("start_datetime")
+                end_datetime = request.data.get("end_datetime") or request.data.get("due_date")
+                archived = request.data.get("archived")
+                
+                if title is not None:
+                    task.title = title
+                if description is not None:
+                    task.description = description
+                if task_status is not None:
+                    task.status = task_status
+                if end_datetime is not None:
+                    task.due_date = parse_datetime(end_datetime) if end_datetime else None
+                if start_datetime is not None:
+                    task.start_date = parse_datetime(start_datetime) if start_datetime else None
+                if archived is not None:
+                    task.archived = archived
+                
+                task.save()
+                
+                # Log Activity
+                if old_status != task.status and task.project:
+                    action_name = "Task Completed" if task.status == "Completed" else "Task Reopened"
+                    ProjectActivity.objects.create(
+                        project=task.project,
+                        user=request.user,
+                        action=action_name,
+                        metadata={
+                            "task_title": task.title,
+                            "task_id": task.id
+                        }
+                    )
+                elif old_archived != task.archived and task.project:
+                    action_name = "Task Archived" if task.archived else "Task Restored"
+                    ProjectActivity.objects.create(
+                        project=task.project,
+                        user=request.user,
+                        action=action_name,
+                        metadata={
+                            "task_title": task.title,
+                            "task_id": task.id
+                        }
+                    )
+                
+                return Response(self._format_task_as_event(task))
+            except (ValueError, IndexError, Task.DoesNotExist):
+                return Response({"detail": "Task event not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            event = CalendarEvent.objects.get(id=pk, owner=request.user)
+            old_reminder = event.reminder_minutes
+            old_type = event.event_type
+            old_archived = event.archived
+            
+            serializer = self.get_serializer(event, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            updated_event = serializer.save()
+            
+            # Log Activity
+            if updated_event.project:
+                actions = []
+                if old_reminder != updated_event.reminder_minutes:
+                    actions.append("Reminder Changed")
+                
+                # If milestone completed
+                # (since CalendarEvent doesn't have completed field directly, we can check metadata or state update)
+                # But let's log "Event Updated" generally
+                action_label = "Event Updated"
+                if old_archived != updated_event.archived:
+                    action_label = "Event Archived" if updated_event.archived else "Event Restored"
+                elif updated_event.event_type == "Milestone" and old_type != "Milestone":
+                    action_label = "Milestone Created"
+                
+                ProjectActivity.objects.create(
+                    project=updated_event.project,
+                    user=request.user,
+                    action=action_label,
+                    metadata={
+                        "event_title": updated_event.title,
+                        "event_id": updated_event.id,
+                        "event_type": updated_event.event_type
+                    }
+                )
+                
+                for act in actions:
+                    ProjectActivity.objects.create(
+                        project=updated_event.project,
+                        user=request.user,
+                        action=act,
+                        metadata={
+                            "event_title": updated_event.title,
+                            "event_id": updated_event.id,
+                            "reminder_minutes": updated_event.reminder_minutes
+                        }
+                    )
+
+            return Response(serializer.data)
+        except CalendarEvent.DoesNotExist:
+            return Response({"detail": "Calendar event not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def destroy(self, request, pk=None, *args, **kwargs):
+        if pk and str(pk).startswith("task_"):
+            try:
+                task_id = int(str(pk).split("_")[1])
+                task = Task.objects.get(id=task_id, owner=request.user)
+                
+                if task.project:
+                    ProjectActivity.objects.create(
+                        project=task.project,
+                        user=request.user,
+                        action="Task Deleted",
+                        metadata={
+                            "task_title": task.title,
+                            "task_id": task.id
+                        }
+                    )
+                
+                task.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except (ValueError, IndexError, Task.DoesNotExist):
+                return Response({"detail": "Task event not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            event = CalendarEvent.objects.get(id=pk, owner=request.user)
+            
+            if event.project:
+                ProjectActivity.objects.create(
+                    project=event.project,
+                    user=request.user,
+                    action="Event Deleted",
+                    metadata={
+                        "event_title": event.title,
+                        "event_id": event.id,
+                        "event_type": event.event_type
+                    }
+                )
+            
+            event.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except CalendarEvent.DoesNotExist:
+            return Response({"detail": "Calendar event not found."}, status=status.HTTP_404_NOT_FOUND)
 
 
+class DocumentViewSet(viewsets.ModelViewSet):
+    serializer_class = DocumentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'slug'
+
+    def get_queryset(self):
+        queryset = Document.objects.filter(owner=self.request.user)
+
+        # Archived filter
+        if self.action == "list":
+            archived = self.request.query_params.get("archived")
+            if archived is not None:
+                if archived.lower() == "true":
+                    queryset = queryset.filter(archived=True)
+                elif archived.lower() == "false":
+                    queryset = queryset.filter(archived=False)
+            else:
+                queryset = queryset.filter(archived=False)
+
+        # Filter by project (slug or ID)
+        project_param = self.request.query_params.get("project")
+        if project_param:
+            if project_param.isdigit():
+                queryset = queryset.filter(project_id=project_param)
+            else:
+                queryset = queryset.filter(project__slug=project_param)
+
+        # Filters
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        visibility_param = self.request.query_params.get("visibility")
+        if visibility_param:
+            queryset = queryset.filter(visibility=visibility_param)
+
+        # Search
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) | Q(content__icontains=search) | Q(slug__icontains=search)
+            )
+
+        # Ordering
+        ordering = self.request.query_params.get("ordering")
+        if ordering:
+            allowed_fields = [
+                "title", "-title",
+                "created_at", "-created_at",
+                "updated_at", "-updated_at",
+                "last_opened_at", "-last_opened_at"
+            ]
+            if ordering in allowed_fields:
+                queryset = queryset.order_by(ordering)
+            else:
+                queryset = queryset.order_by("-updated_at")
+        else:
+            queryset = queryset.order_by("-updated_at")
+
+        return queryset
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.last_opened_at = timezone.now()
+        instance.save(update_fields=['last_opened_at'])
+        
+        # Log Document Opened activity
+        ProjectActivity.objects.create(
+            project=instance.project,
+            user=request.user,
+            action="Document Opened",
+            metadata={
+                "document_title": instance.title,
+                "document_slug": instance.slug,
+                "document_id": instance.id
+            }
+        )
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        instance = serializer.save(
+            owner=self.request.user,
+            last_opened_at=timezone.now()
+        )
+        # Log Document Created
+        ProjectActivity.objects.create(
+            project=instance.project,
+            user=self.request.user,
+            action="Document Created",
+            metadata={
+                "document_title": instance.title,
+                "document_slug": instance.slug,
+                "document_id": instance.id
+            }
+        )
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_status = instance.status
+        old_archived = instance.archived
+        updated_instance = serializer.save()
+
+        # Log Status Change or Document Updated or Archive/Restore
+        if old_archived != updated_instance.archived:
+            action = "Document Archived" if updated_instance.archived else "Document Restored"
+            metadata = {
+                "document_title": updated_instance.title,
+                "document_slug": updated_instance.slug,
+                "document_id": updated_instance.id
+            }
+        elif old_status != updated_instance.status:
+            action = "Document Status Changed"
+            metadata = {
+                "document_title": updated_instance.title,
+                "document_slug": updated_instance.slug,
+                "document_id": updated_instance.id,
+                "old_status": old_status,
+                "new_status": updated_instance.status
+            }
+        else:
+            action = "Document Updated"
+            metadata = {
+                "document_title": updated_instance.title,
+                "document_slug": updated_instance.slug,
+                "document_id": updated_instance.id
+            }
+
+        ProjectActivity.objects.create(
+            project=updated_instance.project,
+            user=self.request.user,
+            action=action,
+            metadata=metadata
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Log Document Deleted before deleting
+        ProjectActivity.objects.create(
+            project=instance.project,
+            user=request.user,
+            action="Document Deleted",
+            metadata={
+                "document_title": instance.title,
+                "document_slug": instance.slug,
+                "document_id": instance.id
+            }
+        )
+        return super().destroy(request, *args, **kwargs)

@@ -10,6 +10,9 @@ interface DeleteConfirmationDialogProps {
   onConfirm: () => Promise<void>;
   projectName: string;
   loading?: boolean;
+  title?: string;
+  confirmText?: string;
+  description?: string;
 }
 
 export function DeleteConfirmationDialog({
@@ -18,6 +21,9 @@ export function DeleteConfirmationDialog({
   onConfirm,
   projectName,
   loading = false,
+  title = "Delete Project",
+  confirmText = "Delete Project",
+  description,
 }: DeleteConfirmationDialogProps) {
   const handleConfirm = async () => {
     try {
@@ -55,7 +61,7 @@ export function DeleteConfirmationDialog({
                 <AlertTriangle size={18} />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-zinc-900 dark:text-zinc-50">Delete Project</h3>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-50">{title}</h3>
                 <p className="text-[10px] text-rose-500 mt-0.5 font-medium">This action cannot be undone.</p>
               </div>
               <button
@@ -68,8 +74,12 @@ export function DeleteConfirmationDialog({
 
             {/* Content */}
             <div className="p-6 space-y-4">
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                Are you sure you want to delete <span className="font-bold text-zinc-900 dark:text-zinc-100">"{projectName}"</span>? All files, content plans, and channels configured within this bounded context will be detached.
+              <p className="text-xs text-zinc-650 dark:text-zinc-400 leading-relaxed">
+                {description || (
+                  <>
+                    Are you sure you want to delete <span className="font-bold text-zinc-900 dark:text-zinc-100">"{projectName}"</span>? All files, content plans, and channels configured within this bounded context will be detached.
+                  </>
+                )}
               </p>
             </div>
 
@@ -94,7 +104,7 @@ export function DeleteConfirmationDialog({
                     Deleting...
                   </>
                 ) : (
-                  "Delete Project"
+                  confirmText
                 )}
               </button>
             </div>

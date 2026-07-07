@@ -11,7 +11,9 @@ import {
   Eye,
   Activity,
   User,
-  Clock
+  Clock,
+  FileText,
+  Trash2
 } from "lucide-react";
 
 interface TimelineProps {
@@ -20,8 +22,51 @@ interface TimelineProps {
 }
 
 export function Timeline({ activities, isLoading = false }: TimelineProps) {
-  const getActionConfig = (action: string) => {
+  const getActionConfig = (activity: ProjectActivity) => {
+    const action = activity.action;
     switch (action) {
+      case "Document Created":
+        return {
+          icon: FileText,
+          color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+          text: `created document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
+      case "Document Updated":
+        return {
+          icon: Edit,
+          color: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+          text: `updated document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
+      case "Document Opened":
+        return {
+          icon: Eye,
+          color: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+          text: `opened document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
+      case "Document Status Changed":
+        return {
+          icon: Activity,
+          color: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+          text: `changed status of "${activity.metadata?.document_title || "Untitled"}" to ${activity.metadata?.new_status || "Draft"}`,
+        };
+      case "Document Deleted":
+        return {
+          icon: Trash2,
+          color: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+          text: `deleted document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
+      case "Document Archived":
+        return {
+          icon: Archive,
+          color: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+          text: `archived document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
+      case "Document Restored":
+        return {
+          icon: RotateCcw,
+          color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+          text: `restored document "${activity.metadata?.document_title || "Untitled"}"`,
+        };
       case "Project Created":
         return {
           icon: FolderPlus,
@@ -102,7 +147,7 @@ export function Timeline({ activities, isLoading = false }: TimelineProps) {
   return (
     <div className="relative pl-4 border-l border-zinc-100 dark:border-zinc-900 space-y-6 py-2">
       {activities.map((activity, index) => {
-        const config = getActionConfig(activity.action);
+        const config = getActionConfig(activity);
         const Icon = config.icon;
         
         // Clean timestamp formatting
