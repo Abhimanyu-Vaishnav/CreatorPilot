@@ -30,11 +30,11 @@ export function Sidebar({ sidebarOpen, setSidebarOpen, isAiEnabled = true, setIs
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const menuItems = [
+  const menuItems: { name: string; href: string; icon: any; disabled?: boolean }[] = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Projects", href: "/dashboard/projects", icon: FolderKanban },
-    { name: "Knowledge Vault", href: "/dashboard/vault", icon: Database, disabled: true },
-    { name: "Writing Studio", href: "/dashboard/studio", icon: FileText, disabled: true },
+    { name: "Knowledge Vault", href: "/dashboard/vault", icon: Database },
+    { name: "Writing Studio", href: "/dashboard/studio", icon: FileText },
     { name: "Content Planner", href: "/dashboard/planner", icon: Calendar },
   ];
 
