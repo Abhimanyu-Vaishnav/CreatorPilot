@@ -42,7 +42,10 @@ class LocalStorage(BaseStorage):
     def get_url(self, storage_path: str) -> str:
         # Django's default_storage.url returns the MEDIA_URL + path prefix
         url = default_storage.url(storage_path)
-        # Ensure it has domain/absolute form if required, else relative works locally
+        # Prefix with backend host so the browser can load the file
+        backend_host = os.environ.get("BACKEND_HOST", "http://localhost:8000")
+        if url.startswith("/"):
+            return f"{backend_host}{url}"
         return url
 
 

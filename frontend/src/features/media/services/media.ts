@@ -188,7 +188,11 @@ export const mediaService = {
   },
 
   deleteMediaAsset: async (slug: string): Promise<void> => {
-    await api.request(`/api/media/${slug}/`, { method: "DELETE" });
+    const response = await api.request(`/api/media/${slug}/`, { method: "DELETE" });
+    if (!response.ok && response.status !== 204) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Delete failed with status ${response.status}`);
+    }
   },
 
   bulkFavorite: async (slugs: string[], favorite: boolean): Promise<any> => {

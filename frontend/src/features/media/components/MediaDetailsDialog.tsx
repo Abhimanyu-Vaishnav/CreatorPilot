@@ -133,8 +133,9 @@ export function MediaDetailsDialog({
       try {
         await deleteMutation.mutateAsync(asset.slug);
         onClose();
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to delete asset", err);
+        alert(`Delete failed: ${err?.message || "Unknown error. Please try again."}`);
       }
     }
   };

@@ -345,8 +345,12 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
   // Single asset actions
   const handleDeleteAsset = async (asset: MediaAsset) => {
     if (window.confirm(`Permanently delete "${asset.title}"?`)) {
-      await deleteMutation.mutateAsync(asset.slug);
-      setSelectedAsset(null);
+      try {
+        await deleteMutation.mutateAsync(asset.slug);
+        setSelectedAsset(null);
+      } catch (err: any) {
+        alert(`Delete failed: ${err?.message || "Unknown error"}`);
+      }
     }
   };
 
