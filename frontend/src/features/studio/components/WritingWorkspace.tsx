@@ -13,6 +13,7 @@ import { useProjectNotesQuery } from "../../notes";
 import { useProjectKnowledgeQuery } from "../../vault";
 import { useProjectTasksQuery } from "../../tasks";
 import { useCalendarEventsQuery } from "../../planner";
+import { useProjectMediaQuery, MediaDetailsDialog } from "../../media";
 import {
   FileText,
   Plus,
@@ -35,6 +36,7 @@ import {
   PlusCircle,
   Archive,
   RotateCcw,
+  Image,
 } from "lucide-react";
 import { DeleteConfirmationDialog } from "../../projects";
 
@@ -45,10 +47,12 @@ interface WritingWorkspaceProps {
 
 export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspaceProps) {
   const [activeDocSlug, setActiveDocSlug] = useState<string | null>(null);
-  const [leftTab, setLeftTab] = useState<"outline" | "notes" | "knowledge">("outline");
+  const [leftTab, setLeftTab] = useState<"outline" | "notes" | "knowledge" | "media">("outline");
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [selectedNote, setSelectedNote] = useState<any | null>(null);
   const [selectedKnowledge, setSelectedKnowledge] = useState<any | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
+  const [isMediaDetailsOpen, setIsMediaDetailsOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -60,6 +64,7 @@ export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspacePro
   const { data: knowledge = [] } = useProjectKnowledgeQuery(projectSlug);
   const { data: tasks = [] } = useProjectTasksQuery(projectSlug);
   const { data: calendarEvents = [] } = useCalendarEventsQuery({ project: projectId.toString() });
+  const { data: mediaAssets = [] } = useProjectMediaQuery(projectSlug, { archived: false });
 
   // Mutations
   const createMutation = useCreateDocumentMutation();
@@ -273,6 +278,16 @@ export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspacePro
               >
                 Vault
               </button>
+              <button
+                onClick={() => setLeftTab("media")}
+                className={`text-[10px] pb-1 px-1.5 transition-all border-b-2 ${
+                  leftTab === "media"
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold"
+                    : "border-transparent text-zinc-500"
+                }`}
+              >
+                Media
+              </button>
             </div>
 
             {/* Tab content */}
@@ -331,6 +346,35 @@ export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspacePro
                       >
                         <ChevronRight size={12} className="mt-0.5 text-zinc-400 flex-shrink-0" />
                         <span className="truncate flex-1 text-zinc-700 dark:text-zinc-300 leading-normal">{k.title}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {leftTab === "media" && (
+                <div className="space-y-1.5 pb-4 animate-fadeIn font-semibold text-xs">
+                  {mediaAssets.length === 0 ? (
+                    <p className="text-[10px] text-zinc-450 dark:text-zinc-650 italic py-4 text-center">No project media assets.</p>
+                  ) : (
+                    mediaAssets.map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedMedia(m);
+                          setIsMediaDetailsOpen(true);
+                        }}
+                        className="w-full text-left p-1.5 rounded border border-zinc-100 dark:border-zinc-900/40 hover:border-indigo-500/25 bg-zinc-50/20 dark:bg-zinc-900/10 transition-all flex items-center gap-2"
+                      >
+                        <ChevronRight size={12} className="text-zinc-400 shrink-0" />
+                        {m.asset_type === "Image" && m.thumbnail_url ? (
+                          <img src={m.thumbnail_url} alt="" className="w-5 h-5 rounded object-cover shrink-0" />
+                        ) : (
+                          <div className="w-5 h-5 rounded bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-[7px] shrink-0 text-zinc-500 font-extrabold uppercase">
+                            {m.asset_type.substring(0, 3)}
+                          </div>
+                        )}
+                        <span className="truncate flex-1 text-zinc-755 dark:text-zinc-300 leading-none">{m.title}</span>
                       </button>
                     ))
                   )}
@@ -485,6 +529,38 @@ export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspacePro
                     <span className="text-[8px] text-zinc-400 font-bold mt-0.5">
                       {new Date(e.start_datetime).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
                     </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Linked Media */}
+          <div className="space-y-2 pb-4 border-b border-zinc-150 dark:border-zinc-900 font-semibold">
+            <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-550 uppercase tracking-wider flex items-center gap-1.5">
+              <Image size={12} /> Linked Media
+            </span>
+            {mediaAssets.filter((m) => m.related_document === activeDoc.id).length === 0 ? (
+              <p className="text-[10px] text-zinc-450 dark:text-zinc-650 italic">No linked media assets.</p>
+            ) : (
+              <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-1">
+                {mediaAssets.filter((m) => m.related_document === activeDoc.id).map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setSelectedMedia(m);
+                      setIsMediaDetailsOpen(true);
+                    }}
+                    className="w-full text-left p-1.5 rounded-lg border border-zinc-100 dark:border-zinc-900 bg-zinc-50/20 dark:bg-zinc-900/10 hover:border-indigo-500/25 flex items-center gap-2 text-[11px] font-semibold transition-all"
+                  >
+                    {m.asset_type === "Image" && m.thumbnail_url ? (
+                      <img src={m.thumbnail_url} alt="" className="w-5 h-5 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-[7px] shrink-0 text-zinc-500 font-extrabold uppercase">
+                        {m.asset_type.substring(0, 3)}
+                      </div>
+                    )}
+                    <span className="truncate flex-1 pr-1">{m.title}</span>
                   </button>
                 ))}
               </div>
@@ -705,6 +781,16 @@ export function WritingWorkspace({ projectSlug, projectId }: WritingWorkspacePro
           }
         }}
         loading={deleteMutation.isPending}
+      />
+
+      <MediaDetailsDialog
+        isOpen={isMediaDetailsOpen}
+        onClose={() => {
+          setIsMediaDetailsOpen(false);
+          setSelectedMedia(null);
+        }}
+        asset={selectedMedia}
+        projectSlug={projectSlug}
       />
     </div>
   );

@@ -21,6 +21,7 @@ import { KnowledgeWorkspace, useProjectKnowledgeQuery } from "../../../../featur
 import { TasksWorkspace, useProjectTasksQuery } from "../../../../features/tasks";
 import { CalendarWorkspace } from "../../../../features/planner";
 import { WritingWorkspace, useProjectDocumentsQuery } from "../../../../features/studio";
+import { MediaWorkspace, useProjectMediaQuery } from "../../../../features/media";
 
 import {
   ArrowLeft,
@@ -89,6 +90,7 @@ export default function ProjectWorkspacePage() {
   const { data: projectKnowledge = [] } = useProjectKnowledgeQuery(slug, undefined, !!project);
   const { data: projectTasks = [] } = useProjectTasksQuery(slug, !!project);
   const { data: projectDocuments = [] } = useProjectDocumentsQuery(slug, !!project);
+  const { data: projectMedia = [] } = useProjectMediaQuery(slug, undefined, !!project);
 
   // Mutations
   const updateMutation = useUpdateProjectMutation();
@@ -146,16 +148,17 @@ export default function ProjectWorkspacePage() {
   const activeKnowledgeCount = projectKnowledge.filter((k) => !k.archived).length;
   const activeTasksCount = projectTasks.filter((t) => !t.archived).length;
   const activeDocumentsCount = projectDocuments.filter((d) => !d.archived).length;
+  const activeMediaCount = projectMedia.filter((m) => !m.archived).length;
 
   const tabs: { id: TabName; label: string; icon: any; lock?: boolean; count?: number }[] = [
     { id: "overview", label: "Overview", icon: Folder },
     { id: "writing", label: "Writing Studio", icon: Edit, count: activeDocumentsCount },
     { id: "notes", label: "Notes", icon: FileText, count: activeNotesCount },
     { id: "tasks", label: "Tasks", icon: CheckSquare, count: activeTasksCount },
-    { id: "media", label: "Media Library", icon: Image, lock: true },
+    { id: "media", label: "Media Library", icon: Image, count: activeMediaCount },
     { id: "vault", label: "Knowledge Vault", icon: Database, count: activeKnowledgeCount },
     { id: "calendar", label: "Content Calendar", icon: CalendarDays },
-    { id: "timeline", label: "Activity Timeline", icon: Activity, lock: true },
+    { id: "timeline", label: "Activity Timeline", icon: Activity },
     { id: "settings", label: "Settings", icon: Settings, lock: true },
   ];
 
@@ -542,7 +545,7 @@ export default function ProjectWorkspacePage() {
                   </div>
                   <div className="flex justify-between items-center py-1.5 text-zinc-800 dark:text-zinc-200 font-semibold">
                     <span className="text-zinc-500">Media Files</span>
-                    <span className="text-zinc-400 text-[10px] uppercase font-bold">Locked</span>
+                    <span>{activeMediaCount} {activeMediaCount === 1 ? "file" : "files"}</span>
                   </div>
                 </div>
               </div>
@@ -579,8 +582,18 @@ export default function ProjectWorkspacePage() {
           <KnowledgeWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : activeTab === "tasks" ? (
           <TasksWorkspace projectSlug={project.slug} projectId={project.id} />
+        ) : activeTab === "media" ? (
+          <MediaWorkspace projectSlug={project.slug} projectId={project.id} />
         ) : activeTab === "calendar" ? (
           <CalendarWorkspace projectSlug={project.slug} projectId={project.id} />
+        ) : activeTab === "timeline" ? (
+          <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] space-y-4 shadow-sm">
+            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2 pb-2 border-b border-zinc-100 dark:border-zinc-900">
+              <Activity size={16} className="text-zinc-400" />
+              Activity Timeline
+            </h3>
+            <Timeline activities={activities} isLoading={isActivityLoading} />
+          </div>
         ) : (
 
           /* Placeholder views for locked tabs */

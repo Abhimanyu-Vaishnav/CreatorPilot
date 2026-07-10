@@ -20,11 +20,13 @@ import { useKnowledgeQuery } from "../../features/vault";
 import { useTasksQuery } from "../../features/tasks";
 import { useCalendarEventsQuery } from "../../features/planner";
 import { useDocumentsQuery } from "../../features/studio";
+import { useMediaQuery } from "../../features/media";
 import {
 
   User,
   ShieldCheck,
   Database,
+  Image as ImageIcon,
   Video,
   Bookmark,
   Globe,
@@ -124,6 +126,14 @@ function DashboardContent() {
   } = useDocumentsQuery();
 
   const activeDocs = allDocuments.filter((d) => !d.archived);
+
+  // Fetch media assets list
+  const {
+    data: allMediaPaginated,
+    isLoading: mediaLoading,
+  } = useMediaQuery({ archived: false });
+
+  const allMedia = allMediaPaginated?.results || [];
 
 
   // Mutations
@@ -1056,6 +1066,110 @@ function DashboardContent() {
                         )}
                       </div>
 
+                    </div>
+                  )}
+                </div>
+
+                {/* Section: Media Library Overview */}
+                <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                  <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-900/60 pb-3">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="text-indigo-650 dark:text-indigo-400" size={16} />
+                      <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">Media Library Assets</h3>
+                    </div>
+                    <span className="text-[10px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-semibold px-2 py-0.5 rounded-full">
+                      {allMedia.length} active files
+                    </span>
+                  </div>
+
+                  {mediaLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 size={18} className="animate-spin text-zinc-400" />
+                    </div>
+                  ) : allMedia.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-zinc-450 dark:text-zinc-550 font-semibold">
+                      No media assets uploaded yet. Open a workspace and select the Media tab to add assets.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Widget 1: Recent Uploads */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold font-sans">
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1 dark:text-zinc-500">
+                          <Plus size={10} /> Recent Uploads
+                        </span>
+                        <div className="space-y-2">
+                          {[...allMedia]
+                            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                            .slice(0, 3)
+                            .map((m) => (
+                              <Link
+                                key={m.id}
+                                href={`/dashboard/projects/${m.project_slug}?tab=media`}
+                                className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                              >
+                                <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-550 truncate">{m.title}</div>
+                                <div className="text-[9px] text-zinc-450 dark:text-zinc-500 mt-0.5 truncate">{m.project_title} • {m.asset_type}</div>
+                              </Link>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Widget 2: Starred Favorites */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold font-sans">
+                        <span className="text-[10px] font-bold text-zinc-455 uppercase tracking-wider flex items-center gap-1 dark:text-zinc-500">
+                          <Star size={10} className="fill-amber-500/10" /> Starred Favorites
+                        </span>
+                        {allMedia.filter((m) => m.favorite).length === 0 ? (
+                          <p className="text-[10px] text-zinc-450 dark:text-zinc-550 py-3">No starred favorites.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {allMedia
+                              .filter((m) => m.favorite)
+                              .slice(0, 3)
+                              .map((m) => (
+                                <Link
+                                  key={m.id}
+                                  href={`/dashboard/projects/${m.project_slug}?tab=media`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-555 truncate">{m.title}</div>
+                                  <div className="text-[9px] text-zinc-450 dark:text-zinc-500 mt-0.5 truncate">{m.project_title} • {m.asset_type}</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Widget 3: Recently Viewed */}
+                      <div className="border border-zinc-150 dark:border-zinc-900/60 p-4 rounded-xl space-y-3 bg-zinc-50/30 dark:bg-zinc-900/10 font-semibold font-sans">
+                        <span className="text-[10px] font-bold text-zinc-405 uppercase tracking-wider flex items-center gap-1 dark:text-zinc-500">
+                          <Clock size={10} /> Recently Viewed
+                        </span>
+                        {allMedia.filter((m) => m.last_opened_at).length === 0 ? (
+                          <p className="text-[10px] text-zinc-455 dark:text-zinc-555 py-3">No recently viewed files.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {[...allMedia]
+                              .filter((m) => m.last_opened_at)
+                              .sort((a, b) => {
+                                const aTime = a.last_opened_at ? new Date(a.last_opened_at).getTime() : 0;
+                                const bTime = b.last_opened_at ? new Date(b.last_opened_at).getTime() : 0;
+                                return bTime - aTime;
+                              })
+                              .slice(0, 3)
+                              .map((m) => (
+                                <Link
+                                  key={m.id}
+                                  href={`/dashboard/projects/${m.project_slug}?tab=media`}
+                                  className="block p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-white dark:bg-[#0e0e11] hover:border-indigo-500/30 hover:shadow-sm transition-all"
+                                >
+                                  <div className="text-[11px] font-bold text-zinc-900 dark:text-zinc-550 truncate">{m.title}</div>
+                                  <div className="text-[9px] text-zinc-400 dark:text-zinc-500 mt-0.5 truncate">{m.project_title} • {m.asset_type}</div>
+                                </Link>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

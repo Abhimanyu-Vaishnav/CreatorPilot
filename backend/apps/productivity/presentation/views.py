@@ -149,7 +149,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 "age_days": age_days,
                 "notes_count": project.notes.filter(archived=False).count(),
                 "tasks_count": project.tasks.filter(archived=False).count(),
-                "media_count": 0,
+                "media_count": project.media_assets.filter(archived=False).count(),
                 "knowledge_count": project.knowledge_items.filter(archived=False).count(),
             }
         })
@@ -328,6 +328,57 @@ class ProjectViewSet(viewsets.ModelViewSet):
             documents = documents.order_by("-updated_at")
             
         serializer = DocumentSerializer(documents, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='media')
+    def media(self, request, slug=None):
+        project = self.get_object()
+        from apps.creative.infrastructure.persistence.models import MediaAsset
+        from apps.creative.presentation.serializers import MediaAssetSerializer
+
+        media_assets = MediaAsset.objects.filter(project=project, owner=request.user)
+
+        # Filters
+        asset_type = request.query_params.get("asset_type")
+        if asset_type:
+            media_assets = media_assets.filter(asset_type=asset_type)
+
+        favorite = request.query_params.get("favorite")
+        if favorite is not None:
+            media_assets = media_assets.filter(favorite=favorite.lower() == "true")
+
+        archived = request.query_params.get("archived")
+        if archived is not None:
+            media_assets = media_assets.filter(archived=archived.lower() == "true")
+        else:
+            media_assets = media_assets.filter(archived=False)
+
+        search = request.query_params.get("search")
+        if search:
+            media_assets = media_assets.filter(
+                Q(title__icontains=search) |
+                Q(tags__icontains=search) |
+                Q(description__icontains=search) |
+                Q(file_name__icontains=search)
+            )
+
+        ordering = request.query_params.get("ordering")
+        if ordering:
+            allowed_fields = [
+                "created_at", "-created_at",
+                "updated_at", "-updated_at",
+                "title", "-title",
+                "file_size", "-file_size",
+                "last_opened_at", "-last_opened_at",
+            ]
+            if ordering in allowed_fields:
+                media_assets = media_assets.order_by(ordering)
+            else:
+                media_assets = media_assets.order_by("-created_at")
+        else:
+            media_assets = media_assets.order_by("-created_at")
+
+        serializer = MediaAssetSerializer(media_assets, many=True, context={'request': request})
         return Response(serializer.data)
 
     @action(detail=True, methods=['get', 'post'], url_path='tasks')
