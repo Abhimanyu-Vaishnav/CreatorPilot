@@ -132,18 +132,14 @@ class MediaAsset(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.slug:
+            import uuid
             # Generate initial slug from title
             base_slug = slugify(self.title)
             if not base_slug:
                 base_slug = "media"
             
-            slug = base_slug
-            counter = 1
-            # Ensure slug is unique globally
-            while MediaAsset.objects.filter(slug=slug).exclude(id=self.id).exists():
-                slug = f"{base_slug}-{counter}"
-                counter += 1
-            self.slug = slug
+            # Generate unique slug with random suffix to avoid concurrent race conditions
+            self.slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

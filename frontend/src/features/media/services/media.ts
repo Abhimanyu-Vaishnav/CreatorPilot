@@ -143,7 +143,7 @@ export const mediaService = {
           try {
             reject(JSON.parse(xhr.responseText));
           } catch (e) {
-            reject(new Error(xhr.responseText || "Upload failed"));
+            reject(new Error("Server error occurred during upload. Please try again."));
           }
         }
       });
