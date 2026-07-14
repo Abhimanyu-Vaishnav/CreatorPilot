@@ -249,6 +249,8 @@ class CalendarEventSerializer(serializers.ModelSerializer):
     project_slug = serializers.CharField(source='project.slug', read_only=True)
     project_title = serializers.CharField(source='project.title', read_only=True)
     task_title = serializers.CharField(source='related_task.title', read_only=True)
+    publish_item_title = serializers.CharField(source='related_publish_item.title', read_only=True)
+    publish_item_slug = serializers.CharField(source='related_publish_item.slug', read_only=True)
 
     class Meta:
         model = CalendarEvent
@@ -260,6 +262,9 @@ class CalendarEventSerializer(serializers.ModelSerializer):
             'project_title',
             'related_task',
             'task_title',
+            'related_publish_item',
+            'publish_item_title',
+            'publish_item_slug',
             'title',
             'description',
             'start_datetime',

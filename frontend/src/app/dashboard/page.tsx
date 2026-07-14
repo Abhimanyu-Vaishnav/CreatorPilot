@@ -21,6 +21,7 @@ import { useTasksQuery } from "../../features/tasks";
 import { useCalendarEventsQuery } from "../../features/planner";
 import { useDocumentsQuery } from "../../features/studio";
 import { useMediaQuery } from "../../features/media";
+import { usePublishItemsQuery } from "../../features/publishing";
 import {
 
   User,
@@ -47,6 +48,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Calendar,
+  SendHorizonal,
+  Rss,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -134,6 +138,14 @@ function DashboardContent() {
   } = useMediaQuery({ archived: false });
 
   const allMedia = allMediaPaginated?.results || [];
+
+  // Fetch publishing items
+  const {
+    data: publishingData,
+    isLoading: publishingLoading,
+  } = usePublishItemsQuery();
+
+  const allPublishItems = publishingData?.results || [];
 
 
   // Mutations
@@ -287,6 +299,34 @@ function DashboardContent() {
       upcomingDeadlines,
     };
   }, [allTasks]);
+
+  // Publishing widgets calculations
+  const publishingWidgets = useMemo(() => {
+    const drafts = allPublishItems.filter((item) => item.status === "Draft");
+    const upcoming = allPublishItems
+      .filter((item) => item.status === "Scheduled" && item.scheduled_at)
+      .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
+    
+    const recentlyPublished = allPublishItems
+      .filter((item) => item.status === "Published" && item.published_at)
+      .sort((a, b) => new Date(b.published_at!).getTime() - new Date(a.published_at!).getTime())
+      .slice(0, 5);
+
+    // Platform Breakdown
+    const breakdown: Record<string, number> = {};
+    allPublishItems.forEach((item) => {
+      const platName = item.platform_details?.name || "Other";
+      breakdown[platName] = (breakdown[platName] || 0) + 1;
+    });
+    const breakdownList = Object.entries(breakdown).map(([name, count]) => ({ name, count }));
+
+    return {
+      draftCount: drafts.length,
+      upcomingPosts: upcoming.slice(0, 5),
+      recentlyPublished,
+      breakdownList,
+    };
+  }, [allPublishItems]);
 
   // Calendar planner widgets calculations
   const plannerWidgets = useMemo(() => {
@@ -1289,6 +1329,111 @@ function DashboardContent() {
                     </div>
                   </div>
                 </div>
+
+              {/* Panel: Publishing Engine Overview */}
+              <div className="p-6 rounded-2xl border border-zinc-200/50 dark:border-zinc-800 bg-white dark:bg-[#0e0e11] shadow-sm space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-900/60">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+                    <SendHorizonal size={13} className="text-violet-500" />
+                    Publishing Engine
+                  </h3>
+                  <Link
+                    href="/dashboard/publishing"
+                    className="text-[10px] font-bold text-violet-600 dark:text-violet-400 hover:underline flex items-center gap-0.5"
+                  >
+                    Open Publishing →
+                  </Link>
+                </div>
+
+                {publishingLoading ? (
+                  <div className="flex justify-center py-4">
+                    <Loader2 size={16} className="animate-spin text-zinc-400" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/10 border border-violet-200/30 dark:border-violet-900/20 space-y-0.5">
+                        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wide">Drafts</p>
+                        <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{publishingWidgets.draftCount}</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/10 border border-emerald-200/30 dark:border-emerald-900/20 space-y-0.5">
+                        <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wide">Published</p>
+                        <p className="text-xl font-bold text-zinc-900 dark:text-zinc-50">{publishingWidgets.recentlyPublished.length}</p>
+                      </div>
+                    </div>
+
+                    {/* Upcoming Scheduled Posts */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Calendar size={10} className="text-violet-400" /> Upcoming Scheduled
+                      </span>
+                      {publishingWidgets.upcomingPosts.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 py-1 font-semibold italic">No posts scheduled yet.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {publishingWidgets.upcomingPosts.map((item) => (
+                            <Link
+                              key={item.id}
+                              href="/dashboard/publishing"
+                              className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-zinc-50/40 dark:bg-zinc-900/5 hover:border-violet-400/30 transition-all"
+                            >
+                              <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate flex-1">{item.title}</span>
+                              <span className="text-[9px] text-violet-500 font-bold shrink-0 ml-2">
+                                {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Recently Published */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 size={10} /> Recently Published
+                      </span>
+                      {publishingWidgets.recentlyPublished.length === 0 ? (
+                        <p className="text-[10px] text-zinc-400 py-1 font-semibold italic">Nothing published yet.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {publishingWidgets.recentlyPublished.slice(0, 3).map((item) => (
+                            <Link
+                              key={item.id}
+                              href="/dashboard/publishing"
+                              className="flex items-center justify-between p-2 rounded-lg border border-zinc-100 dark:border-zinc-900/20 bg-zinc-50/40 dark:bg-zinc-900/5 hover:border-emerald-400/30 transition-all"
+                            >
+                              <span className="text-[11px] font-bold text-zinc-800 dark:text-zinc-200 truncate flex-1">{item.title}</span>
+                              <span className="text-[9px] text-emerald-500 font-bold shrink-0 ml-2">
+                                {item.published_at ? new Date(item.published_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+                              </span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Platform Breakdown */}
+                    {publishingWidgets.breakdownList.length > 0 && (
+                      <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <BarChart3 size={10} className="text-indigo-400" /> Platform Breakdown
+                        </span>
+                        <div className="space-y-1.5">
+                          {publishingWidgets.breakdownList.map(({ name, count }) => (
+                            <div key={name} className="flex items-center justify-between text-[10px] font-semibold">
+                              <span className="text-zinc-600 dark:text-zinc-400">{name}</span>
+                              <span className="bg-violet-50 dark:bg-violet-950/20 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                {count}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               </div>
             </div>

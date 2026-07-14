@@ -13,4 +13,5 @@ urlpatterns = [
     path('api/auth/', include('apps.identity.presentation.urls')),
     path('api/', include('apps.productivity.presentation.urls')),
     path('api/', include('apps.creative.presentation.urls')),
+    path('api/', include('apps.publishing.presentation.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.creative.apps.CreativeConfig",
     "apps.distribution.apps.DistributionConfig",
     "apps.analytics.apps.AnalyticsConfig",
+    "apps.publishing.apps.PublishingConfig",
 ]
 
 MIDDLEWARE = [

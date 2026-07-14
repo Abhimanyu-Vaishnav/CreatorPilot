@@ -103,9 +103,9 @@ export function useDeleteMediaMutation(projectSlug?: string) {
   return useMutation({
     mutationFn: (slug: string) => mediaService.deleteMediaAsset(slug),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["media"] });
+      queryClient.invalidateQueries({ queryKey: ["media"], exact: false });
       if (projectSlug) {
-        queryClient.invalidateQueries({ queryKey: ["project-media", projectSlug] });
+        queryClient.invalidateQueries({ queryKey: ["project-media", projectSlug], exact: false });
         queryClient.invalidateQueries({ queryKey: ["project-overview", projectSlug] });
         queryClient.invalidateQueries({ queryKey: ["project-activity", projectSlug] });
       }
@@ -176,9 +176,9 @@ export function useBulkDeleteMutation(projectSlug?: string) {
   return useMutation({
     mutationFn: (slugs: string[]) => mediaService.bulkDelete(slugs),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["media"] });
+      queryClient.invalidateQueries({ queryKey: ["media"], exact: false });
       if (projectSlug) {
-        queryClient.invalidateQueries({ queryKey: ["project-media", projectSlug] });
+        queryClient.invalidateQueries({ queryKey: ["project-media", projectSlug], exact: false });
         queryClient.invalidateQueries({ queryKey: ["project-overview", projectSlug] });
       }
     },

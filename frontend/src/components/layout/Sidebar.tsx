@@ -36,6 +36,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen, isAiEnabled = true, setIs
     { name: "Knowledge Vault", href: "/dashboard/vault", icon: Database },
     { name: "Writing Studio", href: "/dashboard/studio", icon: FileText },
     { name: "Content Planner", href: "/dashboard/planner", icon: Calendar },
+    { name: "Publishing", href: "/dashboard/publishing", icon: Globe },
   ];
 
   return (

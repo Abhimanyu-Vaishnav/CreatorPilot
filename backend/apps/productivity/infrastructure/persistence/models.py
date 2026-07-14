@@ -364,6 +364,13 @@ class CalendarEvent(models.Model):
         blank=True,
         related_name="calendar_events"
     )
+    related_publish_item = models.ForeignKey(
+        "publishing.PublishItem",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="calendar_events"
+    )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, default="")
     start_datetime = models.DateTimeField()
@@ -378,6 +385,26 @@ class CalendarEvent(models.Model):
 
     class Meta:
         ordering = ["start_datetime"]
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.related_publish_item and self.event_type == "Content Plan":
+            publish_item = self.related_publish_item
+            if publish_item.scheduled_at != self.start_datetime:
+                publish_item.scheduled_at = self.start_datetime
+                if publish_item.status in ["Draft", "Approved", "In Review"]:
+                    publish_item.status = "Scheduled"
+                publish_item.save(update_fields=["scheduled_at", "status"])
+                try:
+                    from apps.publishing.infrastructure.persistence.models import PublishHistory
+                    PublishHistory.objects.create(
+                        publish_item=publish_item,
+                        action="Scheduled",
+                        performed_by=self.owner,
+                        notes=f"Scheduled via Calendar event update to {self.start_datetime}"
+                    )
+                except Exception:
+                    pass
 
     def __str__(self):
         return self.title

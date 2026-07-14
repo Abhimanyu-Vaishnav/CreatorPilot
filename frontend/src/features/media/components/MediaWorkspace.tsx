@@ -88,6 +88,10 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
   // Multi-selection set
   const [selectedSlugs, setSelectedSlugs] = useState<Set<string>>(new Set());
 
+  // Confirm delete dialog state
+  const [confirmDelete, setConfirmDelete] = useState<{ type: "single" | "bulk"; asset?: MediaAsset } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Upload dialog & Upload queue hook
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const uploadQueue = useUploadQueue(projectSlug, projectId, currentFolderId);
@@ -335,22 +339,35 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
   };
 
   const handleBulkDelete = () => {
-    if (window.confirm(`Are you sure you want to permanently delete these ${selectedSlugs.size} assets?`)) {
-      bulkDelMutation.mutate(Array.from(selectedSlugs), {
-        onSuccess: () => setSelectedSlugs(new Set())
-      });
-    }
+    setDeleteError(null);
+    setConfirmDelete({ type: "bulk" });
+  };
+
+  const executeBulkDelete = () => {
+    bulkDelMutation.mutate(Array.from(selectedSlugs), {
+      onSuccess: () => {
+        setSelectedSlugs(new Set());
+        setConfirmDelete(null);
+      },
+      onError: (err: any) => {
+        setDeleteError(err?.message || "Bulk delete failed. Please try again.");
+      }
+    });
   };
 
   // Single asset actions
-  const handleDeleteAsset = async (asset: MediaAsset) => {
-    if (window.confirm(`Permanently delete "${asset.title}"?`)) {
-      try {
-        await deleteMutation.mutateAsync(asset.slug);
-        setSelectedAsset(null);
-      } catch (err: any) {
-        alert(`Delete failed: ${err?.message || "Unknown error"}`);
-      }
+  const handleDeleteAsset = (asset: MediaAsset) => {
+    setDeleteError(null);
+    setConfirmDelete({ type: "single", asset });
+  };
+
+  const executeSingleDelete = async (asset: MediaAsset) => {
+    try {
+      await deleteMutation.mutateAsync(asset.slug);
+      setSelectedAsset(null);
+      setConfirmDelete(null);
+    } catch (err: any) {
+      setDeleteError(err?.message || "Delete failed. Please try again.");
     }
   };
 
@@ -502,8 +519,91 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
           </div>
         </div>
 
+        {/* Filter & Search Bar */}
+        <div className="flex flex-wrap items-center gap-2 py-2.5 px-1 shrink-0">
+          {/* Search */}
+          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 flex-1 min-w-[160px]">
+            <Search size={12} className="text-zinc-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search assets..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 bg-transparent text-[11px] font-semibold outline-none text-zinc-700 dark:text-zinc-200 placeholder-zinc-400"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200">
+                <X size={11} />
+              </button>
+            )}
+          </div>
+
+          {/* Asset Type Filter */}
+          <select
+            value={assetType}
+            onChange={(e) => setAssetType(e.target.value as MediaAssetType | "")}
+            className="h-8 px-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/20 dark:bg-zinc-900/10 text-[11px] font-semibold focus:border-indigo-500 focus:outline-none dark:text-zinc-200 cursor-pointer"
+          >
+            <option value="">All Types</option>
+            {ASSET_TYPE_OPTIONS.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          {/* Favorites Toggle */}
+          <button
+            onClick={() => setShowFavorites(f => !f)}
+            className={`h-8 px-3 rounded-xl border text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              showFavorites
+                ? "bg-amber-500 border-amber-500 text-white"
+                : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-amber-400 hover:text-amber-500"
+            }`}
+          >
+            <Star size={11} className={showFavorites ? "fill-white text-white" : ""} />
+            Favorites
+          </button>
+
+          {/* Archived Toggle */}
+          <button
+            onClick={() => {
+              setShowArchived(a => !a);
+              setSelectedSlugs(new Set());
+            }}
+            className={`h-8 px-3 rounded-xl border text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              showArchived
+                ? "bg-violet-600 border-violet-600 text-white"
+                : "border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-violet-400 hover:text-violet-600"
+            }`}
+          >
+            <Archive size={11} />
+            {showArchived ? "Viewing Archived" : "Show Archived"}
+          </button>
+
+          {/* Select All */}
+          {mediaAssets.length > 0 && (
+            <button
+              onClick={() => {
+                if (selectedSlugs.size === mediaAssets.length) {
+                  setSelectedSlugs(new Set());
+                } else {
+                  setSelectedSlugs(new Set(mediaAssets.map(m => m.slug)));
+                }
+              }}
+              className="h-8 px-3 rounded-xl border border-zinc-200 dark:border-zinc-800 text-[11px] font-semibold flex items-center gap-1.5 transition-all hover:border-indigo-400 hover:text-indigo-600 dark:text-zinc-400 cursor-pointer"
+            >
+              <Check size={11} />
+              {selectedSlugs.size === mediaAssets.length && mediaAssets.length > 0 ? "Deselect All" : "Select All"}
+            </button>
+          )}
+
+          {/* Results count */}
+          <span className="ml-auto text-[10px] font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+            {totalCount} {showArchived ? "archived" : "active"} {totalCount === 1 ? "file" : "files"}
+          </span>
+        </div>
+
         {/* List folders + assets in directory */}
-        <div className="flex-1 overflow-y-auto mt-4 pr-1 space-y-4" onScroll={handleScroll}>
+        <div className="flex-1 overflow-y-auto pr-1 space-y-4" onScroll={handleScroll}>
           {/* Folders block */}
           {foldersInDirectory.length > 0 && (
             <div className="space-y-2">
@@ -534,15 +634,36 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
 
           {/* Media assets list */}
           <div className="space-y-2">
-            <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Assets</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                {showArchived ? "Archived Assets" : "Assets"}
+              </span>
+              {showArchived && (
+                <span className="text-[9px] bg-violet-100 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 px-1.5 py-0.5 rounded font-bold">
+                  ARCHIVE VIEW
+                </span>
+              )}
+            </div>
+
 
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="animate-spin text-indigo-600" size={24} />
               </div>
             ) : mediaAssets.length === 0 ? (
-              <div className="py-12 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center text-xs text-zinc-450 dark:text-zinc-550 font-bold">
-                No assets in this directory. Click Upload to add files.
+              <div className="py-12 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-center text-xs text-zinc-450 dark:text-zinc-550 font-bold space-y-2">
+                {showArchived ? (
+                  <>
+                    <Archive size={24} className="mx-auto text-violet-400 mb-2" />
+                    <p>No archived files found.</p>
+                    <p className="text-[10px] font-medium text-zinc-400">Archive assets from the media grid or sidebar to see them here.</p>
+                  </>
+                ) : (
+                  <>
+                    <p>No assets in this directory.</p>
+                    <p className="text-[10px] font-medium text-zinc-400">Click Upload to add files, or use &quot;Show Archived&quot; to view archived media.</p>
+                  </>
+                )}
               </div>
             ) : viewMode === "grid" ? (
               /* Grid layouts with multi selection */
@@ -974,6 +1095,64 @@ export function MediaWorkspace({ projectSlug, projectId }: MediaWorkspaceProps) 
       )}
 
       {/* Modals & Dialog overlays */}
+
+      {/* Confirm Delete Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm mx-4 bg-white dark:bg-[#0e0e11] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-rose-500" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50">
+                  {confirmDelete.type === "bulk"
+                    ? `Delete ${selectedSlugs.size} files?`
+                    : `Delete "${confirmDelete.asset?.title}"?`}
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  This action is permanent and cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
+                disabled={deleteMutation.isPending || bulkDelMutation.isPending}
+                className="flex-1 h-9 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (confirmDelete.type === "bulk") {
+                    executeBulkDelete();
+                  } else if (confirmDelete.asset) {
+                    executeSingleDelete(confirmDelete.asset);
+                  }
+                }}
+                disabled={deleteMutation.isPending || bulkDelMutation.isPending}
+                className="flex-1 h-9 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-md shadow-rose-600/20"
+              >
+                {(deleteMutation.isPending || bulkDelMutation.isPending) ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Trash2 size={13} />
+                )}
+                {(deleteMutation.isPending || bulkDelMutation.isPending) ? "Deleting..." : "Delete Permanently"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Upload dialog */}
       <MediaUploadDialog
         isOpen={isUploadOpen}
